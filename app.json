@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "durus-hatirlatici",
+    "name": "Duruş Hatırlatıcı",
     "slug": "durus-hatirlatici",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -19,6 +19,17 @@
     },
     "web": {
       "favicon": "./assets/favicon.png"
-    }
+    },
+    "plugins": [
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/splash-icon.png",
+          "imageWidth": 220,
+          "resizeMode": "contain",
+          "backgroundColor": "#E6F4FE"
+        }
+      ]
+    ]
   }
 }
