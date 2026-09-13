@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Alert, ScrollView, StyleSheet, Text, View, Pressable } from 'react-native';
 import BreathingScreen from './BreathingScreen';
 import MovementsScreen from './MovementsScreen';
+import AdBanner from '../components/AdBanner';
 
 const CATEGORIES = [
   {
@@ -79,6 +80,8 @@ export default function MeditationScreen() {
           />
         ))}
       </View>
+
+      <AdBanner />
     </ScrollView>
   );
 }

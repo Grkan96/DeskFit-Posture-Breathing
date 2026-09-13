@@ -1,5 +1,14 @@
 import { useState } from 'react';
-import { Pressable, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
+import { Alert, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
+import AdBanner from '../components/AdBanner';
+
+const PRIVACY_TEXT =
+  'Duruş Hatırlatıcı, adını ve tercihlerini yalnızca cihazında saklar; ' +
+  'bunları hiçbir sunucuya göndermez.\n\n' +
+  'Uygulama içindeki reklamlar Google AdMob tarafından sağlanır. AdMob, ' +
+  'reklamları göstermek için cihaz tanımlayıcıları gibi bazı verileri ' +
+  'işleyebilir. Daha fazla bilgi için Google\'ın gizlilik politikasına ' +
+  'bakabilirsin.';
 
 function formatHour(hour) {
   return `${String(hour).padStart(2, '0')}:00`;
@@ -55,7 +64,7 @@ export default function SettingsScreen({
   }
 
   return (
-    <View style={styles.container}>
+    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       <Text style={styles.header}>Ayarlar</Text>
 
       <View style={styles.card}>
@@ -104,15 +113,27 @@ export default function SettingsScreen({
       <Pressable onPress={onTestNotification} style={styles.testButton}>
         <Text style={styles.testButtonText}>Şimdi Test Et (2 sn sonra)</Text>
       </Pressable>
-    </View>
+
+      <Pressable
+        onPress={() => Alert.alert('Gizlilik Politikası', PRIVACY_TEXT)}
+        style={styles.linkRow}
+      >
+        <Text style={styles.linkText}>Gizlilik Politikası</Text>
+      </Pressable>
+
+      <AdBanner />
+    </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+  },
+  content: {
     paddingHorizontal: 20,
     paddingTop: 16,
+    paddingBottom: 24,
   },
   header: {
     fontSize: 20,
@@ -200,5 +221,16 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '600',
     color: '#334155',
+  },
+  linkRow: {
+    marginTop: 16,
+    alignItems: 'center',
+    paddingVertical: 8,
+  },
+  linkText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#94a3b8',
+    textDecorationLine: 'underline',
   },
 });

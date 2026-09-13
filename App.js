@@ -7,6 +7,7 @@ import * as Notifications from 'expo-notifications';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { ensureChannels, scheduleReminder, sendTestNotification } from './lib/notifications';
+import { initializeAds } from './lib/ads';
 import NameScreen from './screens/NameScreen';
 import HomeScreen from './screens/HomeScreen';
 import MeditationScreen from './screens/MeditationScreen';
@@ -30,8 +31,10 @@ export default function App() {
   const [quietEnd, setQuietEnd] = useState(8);
 
   useEffect(() => {
+    // Aşağıdaki adımlardan biri (örn. bildirim API'si) hiç yanıt vermezse
+    // uygulama sonsuza kadar "yükleniyor" ekranında kalmasın diye emniyet.
+    const failSafe = setTimeout(() => setBootstrapped(true), 4000);
     (async () => {
-      await ensureChannels();
       let settings = {
         intervalMinutes,
         soundEnabled,
@@ -41,6 +44,11 @@ export default function App() {
       };
       let name = '';
       try {
+        // Kanal kurulumu (veya herhangi bir adım) başarısız olsa bile
+        // uygulama sonsuza kadar "yükleniyor" ekranında kalmamalı.
+        await ensureChannels();
+        initializeAds();
+
         const savedName = await AsyncStorage.getItem(NAME_KEY);
         if (savedName) name = savedName;
 
@@ -79,8 +87,10 @@ export default function App() {
       } catch (e) {
         // Kayıtlı ayar okunamazsa varsayılanlarla devam et
       }
+      clearTimeout(failSafe);
       setBootstrapped(true);
     })();
+    return () => clearTimeout(failSafe);
   }, []);
 
   useEffect(() => {
