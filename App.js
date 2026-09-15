@@ -126,25 +126,37 @@ export default function App() {
   }, []);
 
   // Bir duruş hatırlatma bildirimi ulaştığında günlük sayacı artır.
+  // Dinleyici kurulumu (native modül tarafında) beklenmedik şekilde hata
+  // verirse bile bu, tüm uygulamayı çökertmesin diye try/catch ile sarıldı.
   useEffect(() => {
-    const subscription = Notifications.addNotificationReceivedListener(() => {
-      incrementTodayReminderCount().then(setTodayReminderCount);
-    });
-    return () => subscription.remove();
+    try {
+      const subscription = Notifications.addNotificationReceivedListener(() => {
+        incrementTodayReminderCount().then(setTodayReminderCount);
+      });
+      return () => subscription.remove();
+    } catch (e) {
+      // Dinleyici kurulamadıysa günlük sayaç güncellenmez, uygulamanın geri
+      // kalanı normal çalışmaya devam eder.
+    }
   }, []);
 
   // Bildirimdeki "Ertele"/"Yaptım" butonlarına basılınca çalışır. Güncel
   // ayarları kullanabilmek için alertMode/vibrationIntensity/userName
   // değiştikçe dinleyici yeniden kurulur (eski değerlere takılı kalmasın diye).
   useEffect(() => {
-    const subscription = Notifications.addNotificationResponseReceivedListener((response) => {
-      const action = response.actionIdentifier;
-      if (action === SNOOZE_ACTION) {
-        scheduleSnooze({ alertMode, vibrationIntensity, userName });
-      }
-      // DONE_ACTION için ek bir işlem gerekmiyor, bildirim kendiliğinden kapanır.
-    });
-    return () => subscription.remove();
+    try {
+      const subscription = Notifications.addNotificationResponseReceivedListener((response) => {
+        const action = response.actionIdentifier;
+        if (action === SNOOZE_ACTION) {
+          scheduleSnooze({ alertMode, vibrationIntensity, userName });
+        }
+        // DONE_ACTION için ek bir işlem gerekmiyor, bildirim kendiliğinden kapanır.
+      });
+      return () => subscription.remove();
+    } catch (e) {
+      // Dinleyici kurulamadıysa "Ertele"/"Yaptım" butonları çalışmaz, ama
+      // uygulama çökmez.
+    }
   }, [alertMode, vibrationIntensity, userName]);
 
   useEffect(() => {

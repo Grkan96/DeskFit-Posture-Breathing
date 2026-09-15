@@ -1,0 +1,79 @@
+diff --git a/node_modules/expo-notifications/build/DevicePushTokenAutoRegistration.fx.js b/node_modules/expo-notifications/build/DevicePushTokenAutoRegistration.fx.js
+index a9511e1..fe61edb 100644
+--- a/node_modules/expo-notifications/build/DevicePushTokenAutoRegistration.fx.js
++++ b/node_modules/expo-notifications/build/DevicePushTokenAutoRegistration.fx.js
+@@ -73,35 +73,47 @@
+     }
+ }
+ if (ServerRegistrationModule.getRegistrationInfoAsync) {
+-    // A global scope (to get all the updates) device push token
+-    // subscription, never cleared.
+-    addPushTokenListener(async (token) => {
+-        try {
+-            // Before updating the push token on server we always check if we should
+-            // Since modules can't change their method availability while running, we
+-            // can assert it's defined.
+-            const registrationInfo = await ServerRegistrationModule.getRegistrationInfoAsync();
+-            if (!registrationInfo) {
+-                // Registration is not enabled
+-                return;
++    // PATCHED: addPushTokenListener() throws synchronously in Expo Go on
++    // Android (push notifications were removed from Expo Go in SDK 53), and
++    // this whole block runs unconditionally as a module-load side effect --
++    // just importing expo-notifications was enough to crash the app on
++    // launch, even for apps that never call any push API themselves. Guard
++    // it so that failure here can't crash module loading; it still works
++    // normally in development/production builds.
++    try {
++        // A global scope (to get all the updates) device push token
++        // subscription, never cleared.
++        addPushTokenListener(async (token) => {
++            try {
++                // Before updating the push token on server we always check if we should
++                // Since modules can't change their method availability while running, we
++                // can assert it's defined.
++                const registrationInfo = await ServerRegistrationModule.getRegistrationInfoAsync();
++                if (!registrationInfo) {
++                    // Registration is not enabled
++                    return;
++                }
++                const registration = JSON.parse(registrationInfo);
++                if (registration?.isEnabled) {
++                    // Dispatch an abortable task to update
++                    // registration with new token.
++                    await updatePushTokenAsync(token);
++                }
+             }
+-            const registration = JSON.parse(registrationInfo);
+-            if (registration?.isEnabled) {
+-                // Dispatch an abortable task to update
+-                // registration with new token.
+-                await updatePushTokenAsync(token);
++            catch (e) {
++                console.warn('[expo-notifications] Error encountered while updating server registration with latest device push token.', e);
+             }
+-        }
+-        catch (e) {
+-            console.warn('[expo-notifications] Error encountered while updating server registration with latest device push token.', e);
+-        }
+-    });
+-    // Verify if persisted registration
+-    // has successfully uploaded last known
+-    // device push token. If not, retry.
+-    ServerRegistrationModule.getRegistrationInfoAsync().then(__handlePersistedRegistrationInfoAsync, (e) => {
+-        console.error('[expo-notifications] Error reading persisted server registration info: ', e);
+-    });
++        });
++        // Verify if persisted registration
++        // has successfully uploaded last known
++        // device push token. If not, retry.
++        ServerRegistrationModule.getRegistrationInfoAsync().then(__handlePersistedRegistrationInfoAsync, (e) => {
++            console.error('[expo-notifications] Error reading persisted server registration info: ', e);
++        });
++    }
++    catch (e) {
++        console.warn('[expo-notifications] Push token auto-registration unavailable (expected in Expo Go).', e);
++    }
+ }
+ else {
+     console.warn(`[expo-notifications] Error encountered while fetching auto-registration state, new tokens will not be automatically registered on server.`, new UnavailabilityError('ServerRegistrationModule', 'getRegistrationInfoAsync'));
