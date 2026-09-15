@@ -1,4 +1,5 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { useThemeColors } from '../lib/theme';
 
 const TABS = [
   { key: 'home', label: 'Ana Ekran', icon: '🏠' },
@@ -7,6 +8,9 @@ const TABS = [
 ];
 
 export default function TabBar({ activeTab, onChange }) {
+  const colors = useThemeColors();
+  const styles = createStyles(colors);
+
   return (
     <View style={styles.bar}>
       {TABS.map((tab) => {
@@ -26,34 +30,36 @@ export default function TabBar({ activeTab, onChange }) {
   );
 }
 
-const styles = StyleSheet.create({
-  bar: {
-    flexDirection: 'row',
-    borderTopWidth: 1,
-    borderTopColor: '#e2e8f0',
-    backgroundColor: '#ffffff',
-    paddingBottom: 8,
-    paddingTop: 6,
-  },
-  tab: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 2,
-  },
-  icon: {
-    fontSize: 18,
-    opacity: 0.5,
-  },
-  iconActive: {
-    opacity: 1,
-  },
-  label: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: '#94a3b8',
-  },
-  labelActive: {
-    color: '#16a34a',
-  },
-});
+function createStyles(colors) {
+  return StyleSheet.create({
+    bar: {
+      flexDirection: 'row',
+      borderTopWidth: 1,
+      borderTopColor: colors.border,
+      backgroundColor: colors.surface,
+      paddingBottom: 8,
+      paddingTop: 6,
+    },
+    tab: {
+      flex: 1,
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 2,
+    },
+    icon: {
+      fontSize: 18,
+      opacity: 0.5,
+    },
+    iconActive: {
+      opacity: 1,
+    },
+    label: {
+      fontSize: 11,
+      fontWeight: '600',
+      color: colors.faint,
+    },
+    labelActive: {
+      color: colors.accent,
+    },
+  });
+}

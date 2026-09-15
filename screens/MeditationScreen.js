@@ -1,8 +1,12 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Alert, ScrollView, StyleSheet, Text, View, Pressable } from 'react-native';
 import BreathingScreen from './BreathingScreen';
 import MovementsScreen from './MovementsScreen';
+import ExercisesScreen from './ExercisesScreen';
+import StatsScreen from './StatsScreen';
 import AdBanner from '../components/AdBanner';
+import { getStats } from '../lib/stats';
+import { useThemeColors } from '../lib/theme';
 
 const CATEGORIES = [
   {
@@ -16,19 +20,19 @@ const CATEGORIES = [
     id: 'exercises',
     icon: '💪',
     title: 'Egzersizler',
-    description: 'Duruşunu güçlendirecek basit, ekipmansız egzersizler.',
-    ready: false,
+    description: '5 kısa, ekipmansız duruş güçlendirme egzersizi.',
+    ready: true,
   },
   {
     id: 'breathing',
     icon: '🌬️',
     title: 'Nefes Dersleri',
-    description: '4-7-8 tekniğiyle rehberli bir nefes egzersizi.',
+    description: '3 farklı teknikle rehberli nefes egzersizleri.',
     ready: true,
   },
 ];
 
-function CategoryCard({ icon, title, description, ready, onPress }) {
+function CategoryCard({ styles, icon, title, description, ready, onPress }) {
   return (
     <Pressable
       style={({ pressed }) => [styles.card, pressed && styles.cardPressed]}
@@ -49,7 +53,16 @@ function CategoryCard({ icon, title, description, ready, onPress }) {
 }
 
 export default function MeditationScreen() {
+  const colors = useThemeColors();
+  const styles = createStyles(colors);
   const [activeSession, setActiveSession] = useState(null);
+  const [stats, setStats] = useState(null);
+
+  useEffect(() => {
+    if (activeSession === null) {
+      getStats().then(setStats);
+    }
+  }, [activeSession]);
 
   if (activeSession === 'breathing') {
     return <BreathingScreen onBack={() => setActiveSession(null)} />;
@@ -57,20 +70,42 @@ export default function MeditationScreen() {
   if (activeSession === 'movements') {
     return <MovementsScreen onBack={() => setActiveSession(null)} />;
   }
+  if (activeSession === 'exercises') {
+    return <ExercisesScreen onBack={() => setActiveSession(null)} />;
+  }
+  if (activeSession === 'stats') {
+    return <StatsScreen onBack={() => setActiveSession(null)} />;
+  }
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       <Text style={styles.emoji}>🌿</Text>
       <Text style={styles.header}>Meditasyon</Text>
       <Text style={styles.subtitle}>
-        Duruşunu desteklemek için kısa hareketler, egzersizler ve nefes dersleri
-        burada olacak.
+        Duruşunu desteklemek için kısa hareketler, egzersizler ve nefes dersleri.
       </Text>
+
+      {stats && stats.totalSessions > 0 && (
+        <Pressable
+          style={({ pressed }) => [styles.statsRow, pressed && styles.cardPressed]}
+          onPress={() => setActiveSession('stats')}
+        >
+          <View style={styles.statBadge}>
+            <Text style={styles.statValue}>🔥 {stats.streak}</Text>
+            <Text style={styles.statLabel}>gün üst üste</Text>
+          </View>
+          <View style={styles.statBadge}>
+            <Text style={styles.statValue}>✅ {stats.totalSessions}</Text>
+            <Text style={styles.statLabel}>seans tamamlandı</Text>
+          </View>
+        </Pressable>
+      )}
 
       <View style={styles.cardList}>
         {CATEGORIES.map((category) => (
           <CategoryCard
             key={category.id}
+            styles={styles}
             {...category}
             onPress={() =>
               category.ready
@@ -86,87 +121,118 @@ export default function MeditationScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-  content: {
-    paddingHorizontal: 20,
-    paddingTop: 16,
-    paddingBottom: 24,
-    alignItems: 'center',
-  },
-  emoji: {
-    fontSize: 32,
-    marginBottom: 4,
-  },
-  header: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: '#0f172a',
-  },
-  subtitle: {
-    marginTop: 6,
-    fontSize: 13,
-    color: '#475569',
-    textAlign: 'center',
-    lineHeight: 19,
-    marginBottom: 20,
-  },
-  cardList: {
-    alignSelf: 'stretch',
-    gap: 12,
-  },
-  card: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#ffffff',
-    borderRadius: 16,
-    paddingHorizontal: 16,
-    paddingVertical: 16,
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOpacity: 0.06,
-    shadowRadius: 6,
-    shadowOffset: { width: 0, height: 2 },
-  },
-  cardPressed: {
-    opacity: 0.8,
-  },
-  cardIcon: {
-    fontSize: 28,
-    marginRight: 14,
-  },
-  cardBody: {
-    flex: 1,
-  },
-  cardTitle: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#0f172a',
-  },
-  cardDescription: {
-    marginTop: 2,
-    fontSize: 12,
-    color: '#64748b',
-    lineHeight: 17,
-  },
-  badge: {
-    backgroundColor: '#e2e8f0',
-    borderRadius: 8,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    marginLeft: 8,
-  },
-  badgeReady: {
-    backgroundColor: '#bbf7d0',
-  },
-  badgeText: {
-    fontSize: 10,
-    fontWeight: '700',
-    color: '#64748b',
-  },
-  badgeTextReady: {
-    color: '#14532d',
-  },
-});
+function createStyles(colors) {
+  return StyleSheet.create({
+    container: {
+      flex: 1,
+    },
+    content: {
+      paddingHorizontal: 20,
+      paddingTop: 16,
+      paddingBottom: 24,
+      alignItems: 'center',
+    },
+    emoji: {
+      fontSize: 32,
+      marginBottom: 4,
+    },
+    header: {
+      fontSize: 20,
+      fontWeight: '700',
+      color: colors.text,
+    },
+    subtitle: {
+      marginTop: 6,
+      fontSize: 13,
+      color: colors.subtext,
+      textAlign: 'center',
+      lineHeight: 19,
+    },
+    statsRow: {
+      flexDirection: 'row',
+      gap: 10,
+      marginTop: 16,
+      marginBottom: 4,
+    },
+    statBadge: {
+      backgroundColor: colors.surface,
+      borderRadius: 14,
+      paddingHorizontal: 16,
+      paddingVertical: 10,
+      alignItems: 'center',
+      elevation: 1,
+      shadowColor: '#000',
+      shadowOpacity: 0.05,
+      shadowRadius: 4,
+      shadowOffset: { width: 0, height: 1 },
+    },
+    statValue: {
+      fontSize: 16,
+      fontWeight: '800',
+      color: colors.text,
+    },
+    statLabel: {
+      fontSize: 10,
+      fontWeight: '600',
+      color: colors.faint,
+      marginTop: 2,
+    },
+    cardList: {
+      alignSelf: 'stretch',
+      gap: 12,
+      marginTop: 20,
+    },
+    card: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: colors.surface,
+      borderRadius: 16,
+      paddingHorizontal: 16,
+      paddingVertical: 16,
+      elevation: 2,
+      shadowColor: '#000',
+      shadowOpacity: 0.06,
+      shadowRadius: 6,
+      shadowOffset: { width: 0, height: 2 },
+    },
+    cardPressed: {
+      opacity: 0.8,
+    },
+    cardIcon: {
+      fontSize: 28,
+      marginRight: 14,
+    },
+    cardBody: {
+      flex: 1,
+    },
+    cardTitle: {
+      fontSize: 16,
+      fontWeight: '700',
+      color: colors.text,
+    },
+    cardDescription: {
+      marginTop: 2,
+      fontSize: 12,
+      color: colors.muted,
+      lineHeight: 17,
+    },
+    badge: {
+      backgroundColor: colors.border,
+      borderRadius: 8,
+      paddingHorizontal: 8,
+      paddingVertical: 4,
+      marginLeft: 8,
+    },
+    badgeReady: {
+      backgroundColor: colors.accentSofter,
+    },
+    badgeText: {
+      fontSize: 10,
+      fontWeight: '700',
+      color: colors.muted,
+    },
+    badgeTextReady: {
+      color: colors.accentText,
+    },
+  });
+}

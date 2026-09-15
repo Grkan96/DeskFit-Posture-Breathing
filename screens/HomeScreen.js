@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
-import CircularDial from '../components/CircularDial';
+import TimeSlider from '../components/TimeSlider';
+import { useThemeColors } from '../lib/theme';
 
 const INTERVALS = [15, 30, 45, 60];
 const MIN_MINUTES = 1;
@@ -17,9 +18,12 @@ export default function HomeScreen({
   quietHoursEnabled,
   quietStart,
   quietEnd,
+  todayReminderCount,
   onStartStop,
   onIntervalCommit,
 }) {
+  const colors = useThemeColors();
+  const styles = createStyles(colors);
   const [customText, setCustomText] = useState('');
 
   function commitCustom() {
@@ -43,6 +47,11 @@ export default function HomeScreen({
             }`
           : 'Kapalı — başlatmak için butona dokun'}
       </Text>
+      {todayReminderCount > 0 && (
+        <Text style={styles.reminderCount}>
+          Bugün {todayReminderCount} hatırlatma aldın 🎯
+        </Text>
+      )}
 
       <Pressable
         onPress={onStartStop}
@@ -63,11 +72,19 @@ export default function HomeScreen({
             <Pressable
               key={minutes}
               onPress={() => onIntervalCommit(minutes)}
-              style={[styles.chip, selected && styles.chipSelected]}
+              accessibilityRole="button"
+              accessibilityState={{ selected }}
+              accessibilityLabel={`${minutes} dakika`}
+              style={({ pressed }) => [
+                styles.chip,
+                selected && styles.chipSelected,
+                pressed && styles.chipPressed,
+              ]}
             >
-              <Text style={[styles.chipText, selected && styles.chipTextSelected]}>
-                {minutes} dk
+              <Text style={[styles.chipValue, selected && styles.chipValueSelected]}>
+                {minutes}
               </Text>
+              <Text style={[styles.chipUnit, selected && styles.chipUnitSelected]}>dk</Text>
             </Pressable>
           );
         })}
@@ -77,109 +94,145 @@ export default function HomeScreen({
           onSubmitEditing={commitCustom}
           onBlur={() => customText && commitCustom()}
           placeholder="özel"
-          placeholderTextColor="#94a3b8"
+          placeholderTextColor={colors.faint}
           keyboardType="number-pad"
           returnKeyType="done"
+          accessibilityLabel="Özel dakika gir"
           style={styles.customChip}
         />
       </View>
 
-      <CircularDial minutes={intervalMinutes} onChange={onIntervalCommit} />
+      <TimeSlider minutes={intervalMinutes} onChange={onIntervalCommit} />
     </View>
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    alignItems: 'center',
-    paddingHorizontal: 24,
-    paddingTop: 16,
-  },
-  greeting: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: '#0f172a',
-  },
-  subtitle: {
-    marginTop: 4,
-    fontSize: 13,
-    color: '#475569',
-    textAlign: 'center',
-  },
-  mainButton: {
-    marginTop: 20,
-    marginBottom: 20,
-    width: 140,
-    height: 140,
-    borderRadius: 70,
-    alignItems: 'center',
-    justifyContent: 'center',
-    elevation: 6,
-    shadowColor: '#000',
-    shadowOpacity: 0.15,
-    shadowRadius: 12,
-    shadowOffset: { width: 0, height: 6 },
-  },
-  mainButtonStart: {
-    backgroundColor: '#16a34a',
-  },
-  mainButtonStop: {
-    backgroundColor: '#dc2626',
-  },
-  mainButtonPressed: {
-    opacity: 0.85,
-    transform: [{ scale: 0.97 }],
-  },
-  mainButtonText: {
-    color: '#ffffff',
-    fontSize: 20,
-    fontWeight: '800',
-    letterSpacing: 1.5,
-  },
-  sectionLabel: {
-    alignSelf: 'flex-start',
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#64748b',
-    marginBottom: 8,
-    textTransform: 'uppercase',
-    letterSpacing: 1,
-  },
-  intervalRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'center',
-    gap: 8,
-    marginBottom: 20,
-  },
-  chip: {
-    paddingVertical: 10,
-    paddingHorizontal: 14,
-    borderRadius: 12,
-    backgroundColor: '#e2e8f0',
-    alignItems: 'center',
-  },
-  chipSelected: {
-    backgroundColor: '#0f172a',
-  },
-  chipText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#334155',
-  },
-  chipTextSelected: {
-    color: '#ffffff',
-  },
-  customChip: {
-    paddingVertical: 10,
-    paddingHorizontal: 12,
-    borderRadius: 12,
-    backgroundColor: '#e2e8f0',
-    color: '#0f172a',
-    fontSize: 14,
-    fontWeight: '600',
-    width: 64,
-    textAlign: 'center',
-  },
-});
+function createStyles(colors) {
+  return StyleSheet.create({
+    container: {
+      flex: 1,
+      alignItems: 'center',
+      paddingHorizontal: 24,
+      paddingTop: 16,
+    },
+    greeting: {
+      fontSize: 20,
+      fontWeight: '700',
+      color: colors.text,
+    },
+    subtitle: {
+      marginTop: 4,
+      fontSize: 13,
+      color: colors.subtext,
+      textAlign: 'center',
+    },
+    reminderCount: {
+      marginTop: 6,
+      fontSize: 12,
+      fontWeight: '600',
+      color: colors.accent,
+    },
+    mainButton: {
+      marginTop: 20,
+      marginBottom: 20,
+      width: 140,
+      height: 140,
+      borderRadius: 70,
+      alignItems: 'center',
+      justifyContent: 'center',
+      elevation: 6,
+      shadowColor: '#000',
+      shadowOpacity: 0.15,
+      shadowRadius: 12,
+      shadowOffset: { width: 0, height: 6 },
+    },
+    mainButtonStart: {
+      backgroundColor: colors.accent,
+    },
+    mainButtonStop: {
+      backgroundColor: colors.danger,
+    },
+    mainButtonPressed: {
+      opacity: 0.85,
+      transform: [{ scale: 0.97 }],
+    },
+    mainButtonText: {
+      color: '#ffffff',
+      fontSize: 20,
+      fontWeight: '800',
+      letterSpacing: 1.5,
+    },
+    sectionLabel: {
+      alignSelf: 'flex-start',
+      fontSize: 12,
+      fontWeight: '600',
+      color: colors.muted,
+      marginBottom: 8,
+      textTransform: 'uppercase',
+      letterSpacing: 1,
+    },
+    intervalRow: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      justifyContent: 'center',
+      gap: 10,
+      marginBottom: 20,
+    },
+    chip: {
+      flexDirection: 'row',
+      alignItems: 'baseline',
+      gap: 3,
+      paddingVertical: 12,
+      paddingHorizontal: 16,
+      borderRadius: 999,
+      minWidth: 62,
+      justifyContent: 'center',
+      backgroundColor: colors.surface,
+      borderWidth: 1.5,
+      borderColor: colors.border,
+    },
+    chipSelected: {
+      backgroundColor: colors.accent,
+      borderColor: colors.accent,
+      elevation: 3,
+      shadowColor: colors.accent,
+      shadowOpacity: 0.35,
+      shadowRadius: 6,
+      shadowOffset: { width: 0, height: 3 },
+    },
+    chipPressed: {
+      opacity: 0.75,
+      transform: [{ scale: 0.96 }],
+    },
+    chipValue: {
+      fontSize: 16,
+      fontWeight: '800',
+      color: colors.text,
+    },
+    chipValueSelected: {
+      color: '#ffffff',
+    },
+    chipUnit: {
+      fontSize: 12,
+      fontWeight: '600',
+      color: colors.faint,
+    },
+    chipUnitSelected: {
+      color: 'rgba(255, 255, 255, 0.8)',
+    },
+    customChip: {
+      paddingVertical: 12,
+      paddingHorizontal: 12,
+      borderRadius: 999,
+      minWidth: 62,
+      backgroundColor: colors.surface,
+      borderWidth: 1.5,
+      borderColor: colors.borderStrong,
+      borderStyle: 'dashed',
+      color: colors.text,
+      fontSize: 14,
+      fontWeight: '700',
+      textAlign: 'center',
+    },
+  });
+}

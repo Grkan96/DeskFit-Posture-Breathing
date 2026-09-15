@@ -6,9 +6,20 @@ import { StatusBar } from 'expo-status-bar';
 import * as Notifications from 'expo-notifications';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-import { ensureChannels, scheduleReminder, sendTestNotification } from './lib/notifications';
+import {
+  ensureChannels,
+  ensureNotificationCategories,
+  scheduleReminder,
+  scheduleSnooze,
+  sendTestNotification,
+  SNOOZE_ACTION,
+  DONE_ACTION,
+} from './lib/notifications';
 import { initializeAds } from './lib/ads';
+import { getTodayReminderCount, incrementTodayReminderCount } from './lib/reminderLog';
+import { useThemeColors } from './lib/theme';
 import NameScreen from './screens/NameScreen';
+import OnboardingScreen from './screens/OnboardingScreen';
 import HomeScreen from './screens/HomeScreen';
 import MeditationScreen from './screens/MeditationScreen';
 import SettingsScreen from './screens/SettingsScreen';
@@ -16,19 +27,25 @@ import TabBar from './components/TabBar';
 
 const SETTINGS_KEY = 'durus-hatirlatici/settings';
 const NAME_KEY = 'durus-hatirlatici/username';
+const ONBOARDING_KEY = 'durus-hatirlatici/onboarding-seen';
 const INTERVALS = [15, 30, 45, 60];
 
 export default function App() {
+  const colors = useThemeColors();
+  const styles = createStyles(colors);
   const [bootstrapped, setBootstrapped] = useState(false);
   const [userName, setUserName] = useState('');
+  const [onboardingSeen, setOnboardingSeen] = useState(false);
   const [activeTab, setActiveTab] = useState('home');
 
   const [isRunning, setIsRunning] = useState(false);
   const [intervalMinutes, setIntervalMinutes] = useState(30);
-  const [soundEnabled, setSoundEnabled] = useState(true);
+  const [alertMode, setAlertMode] = useState('sound');
+  const [vibrationIntensity, setVibrationIntensity] = useState('medium');
   const [quietHoursEnabled, setQuietHoursEnabled] = useState(false);
   const [quietStart, setQuietStart] = useState(23);
   const [quietEnd, setQuietEnd] = useState(8);
+  const [todayReminderCount, setTodayReminderCount] = useState(0);
 
   useEffect(() => {
     // Aşağıdaki adımlardan biri (örn. bildirim API'si) hiç yanıt vermezse
@@ -37,7 +54,8 @@ export default function App() {
     (async () => {
       let settings = {
         intervalMinutes,
-        soundEnabled,
+        alertMode,
+        vibrationIntensity,
         quietHoursEnabled,
         quietStart,
         quietEnd,
@@ -47,10 +65,14 @@ export default function App() {
         // Kanal kurulumu (veya herhangi bir adım) başarısız olsa bile
         // uygulama sonsuza kadar "yükleniyor" ekranında kalmamalı.
         await ensureChannels();
+        await ensureNotificationCategories();
         initializeAds();
 
         const savedName = await AsyncStorage.getItem(NAME_KEY);
         if (savedName) name = savedName;
+
+        const seenOnboarding = await AsyncStorage.getItem(ONBOARDING_KEY);
+        setOnboardingSeen(seenOnboarding === 'true');
 
         const raw = await AsyncStorage.getItem(SETTINGS_KEY);
         if (raw) {
@@ -58,7 +80,15 @@ export default function App() {
           if (INTERVALS.includes(saved.intervalMinutes) || Number.isInteger(saved.intervalMinutes)) {
             settings.intervalMinutes = saved.intervalMinutes;
           }
-          settings.soundEnabled = saved.soundEnabled !== false;
+          if (['silent', 'vibrate', 'sound'].includes(saved.alertMode)) {
+            settings.alertMode = saved.alertMode;
+          } else if (typeof saved.soundEnabled === 'boolean') {
+            // Eski ayar biçiminden göç: sesli aç/kapa -> yeni 3'lü mod.
+            settings.alertMode = saved.soundEnabled ? 'sound' : 'vibrate';
+          }
+          if (['light', 'medium', 'strong'].includes(saved.vibrationIntensity)) {
+            settings.vibrationIntensity = saved.vibrationIntensity;
+          }
           settings.quietHoursEnabled = saved.quietHoursEnabled === true;
           if (Number.isInteger(saved.quietStart) && saved.quietStart >= 0 && saved.quietStart < 24) {
             settings.quietStart = saved.quietStart;
@@ -70,10 +100,12 @@ export default function App() {
 
         setUserName(name);
         setIntervalMinutes(settings.intervalMinutes);
-        setSoundEnabled(settings.soundEnabled);
+        setAlertMode(settings.alertMode);
+        setVibrationIntensity(settings.vibrationIntensity);
         setQuietHoursEnabled(settings.quietHoursEnabled);
         setQuietStart(settings.quietStart);
         setQuietEnd(settings.quietEnd);
+        setTodayReminderCount(await getTodayReminderCount());
 
         // Gerçek durumu işletim sisteminden oku: zamanlanmış bildirim var mı?
         const scheduled = await Notifications.getAllScheduledNotificationsAsync();
@@ -93,19 +125,50 @@ export default function App() {
     return () => clearTimeout(failSafe);
   }, []);
 
+  // Bir duruş hatırlatma bildirimi ulaştığında günlük sayacı artır.
+  useEffect(() => {
+    const subscription = Notifications.addNotificationReceivedListener(() => {
+      incrementTodayReminderCount().then(setTodayReminderCount);
+    });
+    return () => subscription.remove();
+  }, []);
+
+  // Bildirimdeki "Ertele"/"Yaptım" butonlarına basılınca çalışır. Güncel
+  // ayarları kullanabilmek için alertMode/vibrationIntensity/userName
+  // değiştikçe dinleyici yeniden kurulur (eski değerlere takılı kalmasın diye).
+  useEffect(() => {
+    const subscription = Notifications.addNotificationResponseReceivedListener((response) => {
+      const action = response.actionIdentifier;
+      if (action === SNOOZE_ACTION) {
+        scheduleSnooze({ alertMode, vibrationIntensity, userName });
+      }
+      // DONE_ACTION için ek bir işlem gerekmiyor, bildirim kendiliğinden kapanır.
+    });
+    return () => subscription.remove();
+  }, [alertMode, vibrationIntensity, userName]);
+
   useEffect(() => {
     if (!bootstrapped) return;
     AsyncStorage.setItem(
       SETTINGS_KEY,
       JSON.stringify({
         intervalMinutes,
-        soundEnabled,
+        alertMode,
+        vibrationIntensity,
         quietHoursEnabled,
         quietStart,
         quietEnd,
       })
     ).catch(() => {});
-  }, [bootstrapped, intervalMinutes, soundEnabled, quietHoursEnabled, quietStart, quietEnd]);
+  }, [
+    bootstrapped,
+    intervalMinutes,
+    alertMode,
+    vibrationIntensity,
+    quietHoursEnabled,
+    quietStart,
+    quietEnd,
+  ]);
 
   async function requestPermission() {
     const current = await Notifications.getPermissionsAsync();
@@ -117,7 +180,8 @@ export default function App() {
   function currentSettings(overrides = {}) {
     return {
       intervalMinutes,
-      soundEnabled,
+      alertMode,
+      vibrationIntensity,
       quietHoursEnabled,
       quietStart,
       quietEnd,
@@ -153,10 +217,17 @@ export default function App() {
     }
   }
 
-  async function handleSoundChange(value) {
-    setSoundEnabled(value);
+  async function handleAlertModeChange(mode) {
+    setAlertMode(mode);
     if (isRunning) {
-      await scheduleReminder(currentSettings({ soundEnabled: value }));
+      await scheduleReminder(currentSettings({ alertMode: mode }));
+    }
+  }
+
+  async function handleVibrationIntensityChange(intensity) {
+    setVibrationIntensity(intensity);
+    if (isRunning) {
+      await scheduleReminder(currentSettings({ vibrationIntensity: intensity }));
     }
   }
 
@@ -181,10 +252,15 @@ export default function App() {
     }
   }
 
+  async function handleOnboardingFinish() {
+    setOnboardingSeen(true);
+    await AsyncStorage.setItem(ONBOARDING_KEY, 'true').catch(() => {});
+  }
+
   async function handleTestNotification() {
     const ok = await requestPermission();
     if (!ok) return;
-    await sendTestNotification({ soundEnabled, userName });
+    await sendTestNotification({ alertMode, vibrationIntensity, userName });
   }
 
   if (!bootstrapped) {
@@ -202,8 +278,21 @@ export default function App() {
       <GestureHandlerRootView style={styles.blank}>
         <SafeAreaProvider>
           <SafeAreaView style={styles.blank} edges={['top', 'bottom']}>
-            <StatusBar style="dark" />
+            <StatusBar style="auto" />
             <NameScreen onSubmit={handleNameSubmit} />
+          </SafeAreaView>
+        </SafeAreaProvider>
+      </GestureHandlerRootView>
+    );
+  }
+
+  if (!onboardingSeen) {
+    return (
+      <GestureHandlerRootView style={styles.blank}>
+        <SafeAreaProvider>
+          <SafeAreaView style={styles.blank} edges={['top', 'bottom']}>
+            <StatusBar style="auto" />
+            <OnboardingScreen onFinish={handleOnboardingFinish} />
           </SafeAreaView>
         </SafeAreaProvider>
       </GestureHandlerRootView>
@@ -214,7 +303,7 @@ export default function App() {
     <GestureHandlerRootView style={styles.blank}>
       <SafeAreaProvider>
         <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
-          <StatusBar style="dark" />
+          <StatusBar style="auto" />
           <View style={styles.screen}>
             {activeTab === 'home' && (
               <HomeScreen
@@ -224,6 +313,7 @@ export default function App() {
                 quietHoursEnabled={quietHoursEnabled}
                 quietStart={quietStart}
                 quietEnd={quietEnd}
+                todayReminderCount={todayReminderCount}
                 onStartStop={handleStartStop}
                 onIntervalCommit={handleIntervalCommit}
               />
@@ -233,8 +323,10 @@ export default function App() {
               <SettingsScreen
                 userName={userName}
                 onNameChange={handleNameSubmit}
-                soundEnabled={soundEnabled}
-                onSoundChange={handleSoundChange}
+                alertMode={alertMode}
+                onAlertModeChange={handleAlertModeChange}
+                vibrationIntensity={vibrationIntensity}
+                onVibrationIntensityChange={handleVibrationIntensityChange}
                 quietHoursEnabled={quietHoursEnabled}
                 onQuietHoursToggle={handleQuietHoursToggle}
                 quietStart={quietStart}
@@ -252,16 +344,18 @@ export default function App() {
   );
 }
 
-const styles = StyleSheet.create({
-  blank: {
-    flex: 1,
-    backgroundColor: '#f8fafc',
-  },
-  container: {
-    flex: 1,
-    backgroundColor: '#f8fafc',
-  },
-  screen: {
-    flex: 1,
-  },
-});
+function createStyles(colors) {
+  return StyleSheet.create({
+    blank: {
+      flex: 1,
+      backgroundColor: colors.bg,
+    },
+    container: {
+      flex: 1,
+      backgroundColor: colors.bg,
+    },
+    screen: {
+      flex: 1,
+    },
+  });
+}
