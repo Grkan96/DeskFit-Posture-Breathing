@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { recordSessionCompleted } from '../lib/stats';
+import { celebrateIfMilestone } from '../lib/celebrateMilestone';
 import { useThemeColors } from '../lib/theme';
+import { useTranslation } from '../lib/i18n';
 
 function initialSession(steps) {
   return { stepIndex: 0, secondsLeft: steps[0].seconds, done: false };
@@ -13,6 +15,7 @@ function initialSession(steps) {
 export default function StepSession({ title, subtitle, steps, onBack, idleIcon = '🧘', type }) {
   const colors = useThemeColors();
   const styles = createStyles(colors);
+  const { t } = useTranslation();
   const [running, setRunning] = useState(false);
   const [finished, setFinished] = useState(false);
   const [session, setSession] = useState(() => initialSession(steps));
@@ -38,7 +41,7 @@ export default function StepSession({ title, subtitle, steps, onBack, idleIcon =
     if (session.done) {
       setRunning(false);
       setFinished(true);
-      recordSessionCompleted(type);
+      recordSessionCompleted(type).then(celebrateIfMilestone);
     }
   }, [session.done]);
 
@@ -69,12 +72,13 @@ export default function StepSession({ title, subtitle, steps, onBack, idleIcon =
   return (
     <View style={styles.container}>
       <Pressable onPress={onBack} style={styles.backButton} hitSlop={10}>
-        <Text style={styles.backText}>‹ Meditasyon</Text>
+        <Text style={styles.backText}>{t('stepSession.backToMeditation')}</Text>
       </Pressable>
 
       <Text style={styles.title}>{title}</Text>
       <Text style={styles.subtitle}>
-        {subtitle} · toplam ~{Math.round(totalSeconds / 60) || 1} dakika.
+        {subtitle}{' '}
+        {t('stepSession.approxMinutes', { minutes: Math.round(totalSeconds / 60) || 1 })}
       </Text>
 
       <View style={styles.body}>
@@ -101,19 +105,17 @@ export default function StepSession({ title, subtitle, steps, onBack, idleIcon =
             </View>
 
             <Pressable onPress={handleSkip} style={styles.skipButton} hitSlop={8}>
-              <Text style={styles.skipText}>Sonraki ›</Text>
+              <Text style={styles.skipText}>{t('stepSession.nextButton')}</Text>
             </Pressable>
           </>
         ) : (
           <View style={styles.card}>
             <Text style={styles.cardIcon}>{finished ? '🎉' : idleIcon}</Text>
             <Text style={styles.cardTitle}>
-              {finished ? 'Harika, tamamladın!' : 'Hazır mısın?'}
+              {finished ? t('stepSession.doneTitle') : t('stepSession.readyTitle')}
             </Text>
             <Text style={styles.cardInstruction}>
-              {finished
-                ? 'Duruşun için küçük ama etkili bir mola verdin.'
-                : 'Sırayla gelecek adımları takip et, her biri kısa sürer.'}
+              {finished ? t('stepSession.doneBody') : t('stepSession.readyBody')}
             </Text>
           </View>
         )}
@@ -127,7 +129,11 @@ export default function StepSession({ title, subtitle, steps, onBack, idleIcon =
         ]}
       >
         <Text style={styles.actionButtonText}>
-          {running ? 'Durdur' : finished ? 'Tekrar Başla' : 'Başla'}
+          {running
+            ? t('stepSession.stop')
+            : finished
+              ? t('stepSession.restart')
+              : t('stepSession.start')}
         </Text>
       </Pressable>
     </View>

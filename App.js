@@ -9,9 +9,12 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   ensureChannels,
   ensureNotificationCategories,
+  isPostureReminderScheduled,
+  cancelPostureReminders,
   scheduleReminder,
   scheduleSnooze,
   sendTestNotification,
+  setEyeRestReminders,
   SNOOZE_ACTION,
   DONE_ACTION,
 } from './lib/notifications';
@@ -45,6 +48,7 @@ export default function App() {
   const [quietHoursEnabled, setQuietHoursEnabled] = useState(false);
   const [quietStart, setQuietStart] = useState(23);
   const [quietEnd, setQuietEnd] = useState(8);
+  const [eyeRestEnabled, setEyeRestEnabled] = useState(false);
   const [todayReminderCount, setTodayReminderCount] = useState(0);
 
   useEffect(() => {
@@ -59,6 +63,7 @@ export default function App() {
         quietHoursEnabled,
         quietStart,
         quietEnd,
+        eyeRestEnabled,
       };
       let name = '';
       try {
@@ -96,6 +101,7 @@ export default function App() {
           if (Number.isInteger(saved.quietEnd) && saved.quietEnd >= 0 && saved.quietEnd < 24) {
             settings.quietEnd = saved.quietEnd;
           }
+          settings.eyeRestEnabled = saved.eyeRestEnabled === true;
         }
 
         setUserName(name);
@@ -105,16 +111,27 @@ export default function App() {
         setQuietHoursEnabled(settings.quietHoursEnabled);
         setQuietStart(settings.quietStart);
         setQuietEnd(settings.quietEnd);
+        setEyeRestEnabled(settings.eyeRestEnabled);
         setTodayReminderCount(await getTodayReminderCount());
 
-        // Gerçek durumu işletim sisteminden oku: zamanlanmış bildirim var mı?
-        const scheduled = await Notifications.getAllScheduledNotificationsAsync();
-        const wasRunning = scheduled.length > 0;
+        // Gerçek durumu işletim sisteminden oku: duruş hatırlatıcısı zaten
+        // zamanlanmış mı? (Göz dinlendirme ayrı bir kategoride zamanlandığı
+        // için bu sayıma karışmaz.)
+        const wasRunning = await isPostureReminderScheduled();
         setIsRunning(wasRunning);
         // Zamanlama sonlu bir kuyruk olduğu için, uygulama her açıldığında
         // kuyruğu bugünden itibaren yeniden doldur.
         if (wasRunning) {
           await scheduleReminder({ ...settings, userName: name });
+        }
+        if (settings.eyeRestEnabled) {
+          await setEyeRestReminders({
+            enabled: true,
+            quietHoursEnabled: settings.quietHoursEnabled,
+            quietStart: settings.quietStart,
+            quietEnd: settings.quietEnd,
+            userName: name,
+          });
         }
       } catch (e) {
         // Kayıtlı ayar okunamazsa varsayılanlarla devam et
@@ -170,6 +187,7 @@ export default function App() {
         quietHoursEnabled,
         quietStart,
         quietEnd,
+        eyeRestEnabled,
       })
     ).catch(() => {});
   }, [
@@ -180,6 +198,7 @@ export default function App() {
     quietHoursEnabled,
     quietStart,
     quietEnd,
+    eyeRestEnabled,
   ]);
 
   async function requestPermission() {
@@ -202,17 +221,31 @@ export default function App() {
     };
   }
 
+  async function refreshEyeRest(overrides = {}) {
+    await setEyeRestReminders({
+      enabled: eyeRestEnabled,
+      quietHoursEnabled,
+      quietStart,
+      quietEnd,
+      userName,
+      ...overrides,
+    });
+  }
+
   async function handleNameSubmit(name) {
     setUserName(name);
     await AsyncStorage.setItem(NAME_KEY, name).catch(() => {});
     if (isRunning) {
       await scheduleReminder(currentSettings({ userName: name }));
     }
+    if (eyeRestEnabled) {
+      await refreshEyeRest({ userName: name });
+    }
   }
 
   async function handleStartStop() {
     if (isRunning) {
-      await Notifications.cancelAllScheduledNotificationsAsync();
+      await cancelPostureReminders();
       setIsRunning(false);
       return;
     }
@@ -248,12 +281,18 @@ export default function App() {
     if (isRunning) {
       await scheduleReminder(currentSettings({ quietHoursEnabled: value }));
     }
+    if (eyeRestEnabled) {
+      await refreshEyeRest({ quietHoursEnabled: value });
+    }
   }
 
   async function handleQuietStartChange(hour) {
     setQuietStart(hour);
     if (isRunning) {
       await scheduleReminder(currentSettings({ quietStart: hour }));
+    }
+    if (eyeRestEnabled) {
+      await refreshEyeRest({ quietStart: hour });
     }
   }
 
@@ -262,6 +301,14 @@ export default function App() {
     if (isRunning) {
       await scheduleReminder(currentSettings({ quietEnd: hour }));
     }
+    if (eyeRestEnabled) {
+      await refreshEyeRest({ quietEnd: hour });
+    }
+  }
+
+  async function handleEyeRestToggle(value) {
+    setEyeRestEnabled(value);
+    await refreshEyeRest({ enabled: value });
   }
 
   async function handleOnboardingFinish() {
@@ -345,6 +392,8 @@ export default function App() {
                 quietEnd={quietEnd}
                 onQuietStartChange={handleQuietStartChange}
                 onQuietEndChange={handleQuietEndChange}
+                eyeRestEnabled={eyeRestEnabled}
+                onEyeRestToggle={handleEyeRestToggle}
                 onTestNotification={handleTestNotification}
               />
             )}

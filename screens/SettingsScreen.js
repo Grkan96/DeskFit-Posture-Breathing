@@ -2,56 +2,56 @@ import { useState } from 'react';
 import { Alert, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
 import AdBanner from '../components/AdBanner';
 import { useThemeColors, useThemePreference } from '../lib/theme';
-
-const PRIVACY_TEXT =
-  'Duruş Hatırlatıcı, adını ve tercihlerini yalnızca cihazında saklar; ' +
-  'bunları hiçbir sunucuya göndermez.\n\n' +
-  'Uygulama içindeki reklamlar Google AdMob tarafından sağlanır. AdMob, ' +
-  'reklamları göstermek için cihaz tanımlayıcıları gibi bazı verileri ' +
-  'işleyebilir. Daha fazla bilgi için Google\'ın gizlilik politikasına ' +
-  'bakabilirsin.';
+import { useTranslation } from '../lib/i18n';
+import { shareApp } from '../lib/sharing';
 
 const THEME_MODES = [
-  { key: 'system', label: 'Sistem', icon: '🌓' },
-  { key: 'light', label: 'Açık', icon: '☀️' },
-  { key: 'dark', label: 'Koyu', icon: '🌙' },
+  { key: 'system', labelKey: 'settings.themeSystem', icon: '🌓' },
+  { key: 'light', labelKey: 'settings.themeLight', icon: '☀️' },
+  { key: 'dark', labelKey: 'settings.themeDark', icon: '🌙' },
+];
+
+const LANGUAGE_MODES = [
+  { key: 'tr', label: 'Türkçe' },
+  { key: 'en', label: 'English' },
 ];
 
 const ALERT_MODES = [
-  { key: 'silent', label: 'Sessiz' },
-  { key: 'vibrate', label: 'Titreşim' },
-  { key: 'sound', label: 'Sesli' },
+  { key: 'silent', labelKey: 'settings.alertSilent' },
+  { key: 'vibrate', labelKey: 'settings.alertVibrate' },
+  { key: 'sound', labelKey: 'settings.alertSound' },
 ];
 
 const VIBRATION_INTENSITIES = [
-  { key: 'light', label: 'Hafif' },
-  { key: 'medium', label: 'Orta' },
-  { key: 'strong', label: 'Güçlü' },
+  { key: 'light', labelKey: 'settings.vibrationLight' },
+  { key: 'medium', labelKey: 'settings.vibrationMedium' },
+  { key: 'strong', labelKey: 'settings.vibrationStrong' },
 ];
 
 function formatHour(hour) {
   return `${String(hour).padStart(2, '0')}:00`;
 }
 
-function SegmentedControl({ styles, options, value, onChange }) {
+function SegmentedControl({ styles, options, value, onChange, t }) {
   return (
     <View style={styles.segmentRow}>
       {options.map((option) => {
         const selected = option.key === value;
+        const label = option.labelKey ? t(option.labelKey) : option.label;
         return (
           <Pressable
             key={option.key}
             onPress={() => onChange(option.key)}
             accessibilityRole="button"
             accessibilityState={{ selected }}
-            accessibilityLabel={option.label}
+            accessibilityLabel={label}
             style={[styles.segment, selected && styles.segmentSelected]}
           >
             {option.icon && (
               <Text style={styles.segmentIcon}>{option.icon}</Text>
             )}
             <Text style={[styles.segmentText, selected && styles.segmentTextSelected]}>
-              {option.label}
+              {label}
             </Text>
           </Pressable>
         );
@@ -98,10 +98,13 @@ export default function SettingsScreen({
   quietEnd,
   onQuietStartChange,
   onQuietEndChange,
+  eyeRestEnabled,
+  onEyeRestToggle,
   onTestNotification,
 }) {
   const colors = useThemeColors();
   const styles = createStyles(colors);
+  const { t, locale, setLocale } = useTranslation();
   const [themePreference, setThemePreference] = useThemePreference();
   const [nameText, setNameText] = useState(userName);
 
@@ -116,16 +119,16 @@ export default function SettingsScreen({
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      <Text style={styles.header}>Ayarlar</Text>
+      <Text style={styles.header}>{t('settings.header')}</Text>
 
       <View style={styles.card}>
-        <Text style={styles.settingLabel}>İsmin</Text>
+        <Text style={styles.settingLabel}>{t('settings.nameLabel')}</Text>
         <TextInput
           value={nameText}
           onChangeText={setNameText}
           onBlur={commitName}
           onSubmitEditing={commitName}
-          placeholder="İsmin"
+          placeholder={t('settings.namePlaceholder')}
           placeholderTextColor={colors.faint}
           maxLength={24}
           returnKeyType="done"
@@ -134,32 +137,46 @@ export default function SettingsScreen({
       </View>
 
       <View style={styles.card}>
-        <Text style={styles.settingLabel}>Görünüm</Text>
+        <Text style={styles.settingLabel}>{t('settings.appearanceLabel')}</Text>
         <SegmentedControl
           styles={styles}
           options={THEME_MODES}
           value={themePreference}
           onChange={setThemePreference}
+          t={t}
         />
       </View>
 
       <View style={styles.card}>
-        <Text style={styles.settingLabel}>Uyarı modu</Text>
+        <Text style={styles.settingLabel}>{t('settings.languageLabel')}</Text>
+        <SegmentedControl
+          styles={styles}
+          options={LANGUAGE_MODES}
+          value={locale}
+          onChange={setLocale}
+          t={t}
+        />
+      </View>
+
+      <View style={styles.card}>
+        <Text style={styles.settingLabel}>{t('settings.alertModeLabel')}</Text>
         <SegmentedControl
           styles={styles}
           options={ALERT_MODES}
           value={alertMode}
           onChange={onAlertModeChange}
+          t={t}
         />
 
         {alertMode !== 'silent' && (
           <View style={styles.subSection}>
-            <Text style={styles.subLabel}>Titreşim şiddeti</Text>
+            <Text style={styles.subLabel}>{t('settings.vibrationIntensityLabel')}</Text>
             <SegmentedControl
               styles={styles}
               options={VIBRATION_INTENSITIES}
               value={vibrationIntensity}
               onChange={onVibrationIntensityChange}
+              t={t}
             />
           </View>
         )}
@@ -167,7 +184,7 @@ export default function SettingsScreen({
 
       <View style={styles.card}>
         <View style={styles.cardRow}>
-          <Text style={styles.settingLabel}>Gece sessiz saatleri</Text>
+          <Text style={styles.settingLabel}>{t('settings.quietHoursLabel')}</Text>
           <Switch
             value={quietHoursEnabled}
             onValueChange={onQuietHoursToggle}
@@ -179,24 +196,48 @@ export default function SettingsScreen({
           <View style={styles.steppersBlock}>
             <HourStepper
               styles={styles}
-              label="Başlangıç"
+              label={t('settings.quietStartLabel')}
               hour={quietStart}
               onChange={onQuietStartChange}
             />
-            <HourStepper styles={styles} label="Bitiş" hour={quietEnd} onChange={onQuietEndChange} />
+            <HourStepper
+              styles={styles}
+              label={t('settings.quietEndLabel')}
+              hour={quietEnd}
+              onChange={onQuietEndChange}
+            />
           </View>
         )}
       </View>
 
+      <View style={styles.card}>
+        <View style={styles.cardRow}>
+          <View style={styles.settingTextBlock}>
+            <Text style={styles.settingLabel}>{t('settings.eyeRestLabel')}</Text>
+            <Text style={styles.settingHint}>{t('settings.eyeRestHint')}</Text>
+          </View>
+          <Switch
+            value={eyeRestEnabled}
+            onValueChange={onEyeRestToggle}
+            trackColor={{ false: colors.borderStrong, true: colors.accentSoft }}
+            thumbColor={eyeRestEnabled ? colors.accent : colors.inputBg}
+          />
+        </View>
+      </View>
+
       <Pressable onPress={onTestNotification} style={styles.testButton}>
-        <Text style={styles.testButtonText}>Şimdi Test Et (2 sn sonra)</Text>
+        <Text style={styles.testButtonText}>{t('settings.testButton')}</Text>
+      </Pressable>
+
+      <Pressable onPress={shareApp} style={styles.shareButton}>
+        <Text style={styles.shareButtonText}>{t('settings.shareButton')}</Text>
       </Pressable>
 
       <Pressable
-        onPress={() => Alert.alert('Gizlilik Politikası', PRIVACY_TEXT)}
+        onPress={() => Alert.alert(t('settings.privacyTitle'), t('settings.privacyText'))}
         style={styles.linkRow}
       >
-        <Text style={styles.linkText}>Gizlilik Politikası</Text>
+        <Text style={styles.linkText}>{t('settings.privacyLink')}</Text>
       </Pressable>
 
       <AdBanner />
@@ -241,6 +282,15 @@ function createStyles(colors) {
       fontSize: 15,
       fontWeight: '600',
       color: colors.text,
+    },
+    settingTextBlock: {
+      flex: 1,
+      marginRight: 12,
+    },
+    settingHint: {
+      marginTop: 3,
+      fontSize: 12,
+      color: colors.subtext,
     },
     nameInput: {
       marginTop: 10,
@@ -334,6 +384,18 @@ function createStyles(colors) {
       fontSize: 13,
       fontWeight: '600',
       color: colors.subtext,
+    },
+    shareButton: {
+      marginTop: 10,
+      paddingVertical: 12,
+      borderRadius: 12,
+      backgroundColor: colors.accentSofter,
+      alignItems: 'center',
+    },
+    shareButtonText: {
+      fontSize: 13,
+      fontWeight: '700',
+      color: colors.accentText,
     },
     linkRow: {
       marginTop: 16,

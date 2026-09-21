@@ -77,3 +77,84 @@ index a9511e1..fe61edb 100644
  }
  else {
      console.warn(`[expo-notifications] Error encountered while fetching auto-registration state, new tokens will not be automatically registered on server.`, new UnavailabilityError('ServerRegistrationModule', 'getRegistrationInfoAsync'));
+diff --git a/node_modules/expo-notifications/build/TopicSubscriptionModule.android.js b/node_modules/expo-notifications/build/TopicSubscriptionModule.android.js
+index 0000001..0000002 100644
+--- a/node_modules/expo-notifications/build/TopicSubscriptionModule.android.js
++++ b/node_modules/expo-notifications/build/TopicSubscriptionModule.android.js
+@@ -1,3 +1,20 @@
+ import { requireNativeModule } from 'expo-modules-core';
+-export default requireNativeModule('ExpoTopicSubscriptionModule');
++// PATCHED: ExpoTopicSubscriptionModule (FCM topic subscription) was removed
++// from Expo Go along with the rest of the remote-push stack. requireNativeModule
++// throws synchronously the moment this module is imported (not when a topic
++// function is actually called), which crashed the whole app on launch. Fall
++// back to the same no-op stub the package itself uses on other platforms.
++let nativeModule;
++try {
++    nativeModule = requireNativeModule('ExpoTopicSubscriptionModule');
++}
++catch (e) {
++    nativeModule = {
++        addListener: () => { },
++        removeListeners: () => { },
++        subscribeToTopicAsync: () => Promise.resolve(null),
++        unsubscribeFromTopicAsync: () => Promise.resolve(null),
++    };
++}
++export default nativeModule;
+ //# sourceMappingURL=TopicSubscriptionModule.android.js.map
+\ No newline at end of file
+diff --git a/node_modules/expo-notifications/build/PushTokenManager.native.js b/node_modules/expo-notifications/build/PushTokenManager.native.js
+index 0000001..0000002 100644
+--- a/node_modules/expo-notifications/build/PushTokenManager.native.js
++++ b/node_modules/expo-notifications/build/PushTokenManager.native.js
+@@ -1,3 +1,22 @@
+ import { requireNativeModule } from 'expo-modules-core';
+-export default requireNativeModule('ExpoPushTokenManager');
++// PATCHED: guard against ExpoPushTokenManager being unavailable at
++// module-load time (defense in depth alongside the TopicSubscriptionModule
++// and DevicePushTokenAutoRegistration.fx patches) so importing
++// expo-notifications can never crash the app before any push API is
++// actually called. Falls back to the same no-op emitter shape the package
++// itself uses when push isn't supported.
++let nativeModule;
++try {
++    nativeModule = requireNativeModule('ExpoPushTokenManager');
++}
++catch (e) {
++    nativeModule = {
++        addListener: () => ({ remove: () => { } }),
++        removeListener: () => { },
++        removeAllListeners: () => { },
++        emit: () => { },
++        listenerCount: () => 0,
++    };
++}
++export default nativeModule;
+ //# sourceMappingURL=PushTokenManager.native.js.map
+\ No newline at end of file
+diff --git a/node_modules/expo-notifications/build/ServerRegistrationModule.native.js b/node_modules/expo-notifications/build/ServerRegistrationModule.native.js
+index 0000001..0000002 100644
+--- a/node_modules/expo-notifications/build/ServerRegistrationModule.native.js
++++ b/node_modules/expo-notifications/build/ServerRegistrationModule.native.js
+@@ -1,3 +1,18 @@
+ import { requireNativeModule } from 'expo-modules-core';
+-export default requireNativeModule('NotificationsServerRegistrationModule');
++// PATCHED: guard against NotificationsServerRegistrationModule being
++// unavailable at module-load time (defense in depth, see
++// TopicSubscriptionModule.android.js and PushTokenManager.native.js).
++// Falls back to the same no-op emitter shape the package itself uses when
++// server registration isn't supported.
++let nativeModule;
++try {
++    nativeModule = requireNativeModule('NotificationsServerRegistrationModule');
++}
++catch (e) {
++    nativeModule = {
++        addListener: () => { },
++        removeListeners: () => { },
++    };
++}
++export default nativeModule;
+ //# sourceMappingURL=ServerRegistrationModule.native.js.map
+\ No newline at end of file

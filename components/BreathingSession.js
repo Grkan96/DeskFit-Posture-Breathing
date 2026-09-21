@@ -1,7 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
 import { Animated, Pressable, StyleSheet, Text, View } from 'react-native';
 import { recordSessionCompleted } from '../lib/stats';
+import { celebrateIfMilestone } from '../lib/celebrateMilestone';
 import { useThemeColors } from '../lib/theme';
+import { useTranslation } from '../lib/i18n';
 
 const REST_SCALE = 0.75;
 
@@ -9,11 +11,13 @@ function initialSession(phases) {
   return { phaseIndex: 0, secondsLeft: phases[0].seconds, cycle: 1, done: false };
 }
 
-// technique: { title, phases: [{label, seconds, scale}], cycles }
+// technique: { id, phases: [{phaseKey, seconds, scale}], cycles }
 export default function BreathingSession({ technique, onBack }) {
   const colors = useThemeColors();
   const styles = createStyles(colors);
-  const { phases, cycles, title } = technique;
+  const { t } = useTranslation();
+  const { phases, cycles, id } = technique;
+  const title = t(`breathing.techniques.${id}.title`);
   const [running, setRunning] = useState(false);
   const [finished, setFinished] = useState(false);
   const [session, setSession] = useState(() => initialSession(phases));
@@ -48,7 +52,7 @@ export default function BreathingSession({ technique, onBack }) {
     if (session.done) {
       setRunning(false);
       setFinished(true);
-      recordSessionCompleted('breathing');
+      recordSessionCompleted('breathing').then(celebrateIfMilestone);
     }
   }, [session.done]);
 
@@ -82,31 +86,33 @@ export default function BreathingSession({ technique, onBack }) {
   return (
     <View style={styles.container}>
       <Pressable onPress={onBack} style={styles.backButton} hitSlop={10}>
-        <Text style={styles.backText}>‹ Teknikler</Text>
+        <Text style={styles.backText}>{t('breathing.backToTechniques')}</Text>
       </Pressable>
 
       <Text style={styles.title}>{title}</Text>
       <Text style={styles.subtitle}>
-        {phases.map((p) => `${p.label} ${p.seconds}sn`).join(' · ')} — {cycles} tur.
+        {phases.map((p) => `${t(`breathing.${p.phaseKey}`)} ${p.seconds}s`).join(' · ')}
+        {' — '}
+        {t('breathing.cyclesCount', { count: cycles })}
       </Text>
 
       <View style={styles.circleWrap}>
         <Animated.View style={[styles.circle, { transform: [{ scale: scaleAnim }] }]}>
           {running ? (
             <>
-              <Text style={styles.phaseLabel}>{phase.label}</Text>
+              <Text style={styles.phaseLabel}>{t(`breathing.${phase.phaseKey}`)}</Text>
               <Text style={styles.phaseCount}>{session.secondsLeft}</Text>
             </>
           ) : (
             <Text style={styles.circleIdleText}>
-              {finished ? 'Tamamlandı 🌿' : 'Hazır mısın?'}
+              {finished ? t('breathing.doneTitle') : t('breathing.readyTitle')}
             </Text>
           )}
         </Animated.View>
       </View>
 
       <Text style={styles.cycleText}>
-        {running ? `Tur ${session.cycle} / ${cycles}` : ' '}
+        {running ? t('breathing.cycleLabel', { current: session.cycle, total: cycles }) : ' '}
       </Text>
 
       <Pressable
@@ -117,7 +123,7 @@ export default function BreathingSession({ technique, onBack }) {
         ]}
       >
         <Text style={styles.actionButtonText}>
-          {running ? 'Durdur' : finished ? 'Tekrar Başla' : 'Başla'}
+          {running ? t('breathing.stop') : finished ? t('breathing.restart') : t('breathing.start')}
         </Text>
       </Pressable>
     </View>

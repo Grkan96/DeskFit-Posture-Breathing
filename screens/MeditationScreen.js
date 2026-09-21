@@ -7,32 +7,15 @@ import StatsScreen from './StatsScreen';
 import AdBanner from '../components/AdBanner';
 import { getStats } from '../lib/stats';
 import { useThemeColors } from '../lib/theme';
+import { useTranslation } from '../lib/i18n';
 
 const CATEGORIES = [
-  {
-    id: 'movements',
-    icon: '🧘',
-    title: 'Hareketler',
-    description: '5 kısa masa başı gerinme ve gevşeme hareketi.',
-    ready: true,
-  },
-  {
-    id: 'exercises',
-    icon: '💪',
-    title: 'Egzersizler',
-    description: '5 kısa, ekipmansız duruş güçlendirme egzersizi.',
-    ready: true,
-  },
-  {
-    id: 'breathing',
-    icon: '🌬️',
-    title: 'Nefes Dersleri',
-    description: '3 farklı teknikle rehberli nefes egzersizleri.',
-    ready: true,
-  },
+  { id: 'movements', icon: '🧘', ready: true },
+  { id: 'exercises', icon: '💪', ready: true },
+  { id: 'breathing', icon: '🌬️', ready: true },
 ];
 
-function CategoryCard({ styles, icon, title, description, ready, onPress }) {
+function CategoryCard({ styles, icon, title, description, ready, badgeLabel, onPress }) {
   return (
     <Pressable
       style={({ pressed }) => [styles.card, pressed && styles.cardPressed]}
@@ -44,9 +27,7 @@ function CategoryCard({ styles, icon, title, description, ready, onPress }) {
         <Text style={styles.cardDescription}>{description}</Text>
       </View>
       <View style={[styles.badge, ready && styles.badgeReady]}>
-        <Text style={[styles.badgeText, ready && styles.badgeTextReady]}>
-          {ready ? 'Başla' : 'Yakında'}
-        </Text>
+        <Text style={[styles.badgeText, ready && styles.badgeTextReady]}>{badgeLabel}</Text>
       </View>
     </Pressable>
   );
@@ -55,6 +36,7 @@ function CategoryCard({ styles, icon, title, description, ready, onPress }) {
 export default function MeditationScreen() {
   const colors = useThemeColors();
   const styles = createStyles(colors);
+  const { t } = useTranslation();
   const [activeSession, setActiveSession] = useState(null);
   const [stats, setStats] = useState(null);
 
@@ -80,10 +62,8 @@ export default function MeditationScreen() {
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       <Text style={styles.emoji}>🌿</Text>
-      <Text style={styles.header}>Meditasyon</Text>
-      <Text style={styles.subtitle}>
-        Duruşunu desteklemek için kısa hareketler, egzersizler ve nefes dersleri.
-      </Text>
+      <Text style={styles.header}>{t('meditation.header')}</Text>
+      <Text style={styles.subtitle}>{t('meditation.subtitle')}</Text>
 
       {stats && stats.totalSessions > 0 && (
         <Pressable
@@ -92,28 +72,36 @@ export default function MeditationScreen() {
         >
           <View style={styles.statBadge}>
             <Text style={styles.statValue}>🔥 {stats.streak}</Text>
-            <Text style={styles.statLabel}>gün üst üste</Text>
+            <Text style={styles.statLabel}>{t('meditation.statsStreak')}</Text>
           </View>
           <View style={styles.statBadge}>
             <Text style={styles.statValue}>✅ {stats.totalSessions}</Text>
-            <Text style={styles.statLabel}>seans tamamlandı</Text>
+            <Text style={styles.statLabel}>{t('meditation.statsSessions')}</Text>
           </View>
         </Pressable>
       )}
 
       <View style={styles.cardList}>
-        {CATEGORIES.map((category) => (
-          <CategoryCard
-            key={category.id}
-            styles={styles}
-            {...category}
-            onPress={() =>
-              category.ready
-                ? setActiveSession(category.id)
-                : Alert.alert(category.title, 'Bu bölüm yakında eklenecek. Takipte kal! 🌱')
-            }
-          />
-        ))}
+        {CATEGORIES.map((category) => {
+          const title = t(`meditation.categories.${category.id}.title`);
+          const description = t(`meditation.categories.${category.id}.description`);
+          return (
+            <CategoryCard
+              key={category.id}
+              styles={styles}
+              icon={category.icon}
+              ready={category.ready}
+              title={title}
+              description={description}
+              badgeLabel={category.ready ? t('meditation.badgeReady') : t('meditation.badgeSoon')}
+              onPress={() =>
+                category.ready
+                  ? setActiveSession(category.id)
+                  : Alert.alert(title, t('meditation.comingSoonBody'))
+              }
+            />
+          );
+        })}
       </View>
 
       <AdBanner />

@@ -3,10 +3,12 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import BreathingSession from '../components/BreathingSession';
 import { TECHNIQUES } from '../lib/breathingTechniques';
 import { useThemeColors } from '../lib/theme';
+import { useTranslation } from '../lib/i18n';
 
 export default function BreathingScreen({ onBack }) {
   const colors = useThemeColors();
   const styles = createStyles(colors);
+  const { t } = useTranslation();
   const [technique, setTechnique] = useState(null);
 
   if (technique) {
@@ -16,23 +18,25 @@ export default function BreathingScreen({ onBack }) {
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       <Pressable onPress={onBack} style={styles.backButton} hitSlop={10}>
-        <Text style={styles.backText}>‹ Meditasyon</Text>
+        <Text style={styles.backText}>{t('breathing.backToMeditation')}</Text>
       </Pressable>
 
-      <Text style={styles.header}>Nefes Dersleri</Text>
-      <Text style={styles.subtitle}>Bir teknik seç, adımları takip et.</Text>
+      <Text style={styles.header}>{t('breathing.header')}</Text>
+      <Text style={styles.subtitle}>{t('breathing.subtitle')}</Text>
 
       <View style={styles.list}>
-        {TECHNIQUES.map((t) => (
+        {TECHNIQUES.map((tech) => (
           <Pressable
-            key={t.id}
+            key={tech.id}
             style={({ pressed }) => [styles.card, pressed && styles.cardPressed]}
-            onPress={() => setTechnique(t)}
+            onPress={() => setTechnique(tech)}
           >
-            <Text style={styles.cardIcon}>{t.icon}</Text>
+            <Text style={styles.cardIcon}>{tech.icon}</Text>
             <View style={styles.cardBody}>
-              <Text style={styles.cardTitle}>{t.title}</Text>
-              <Text style={styles.cardDescription}>{t.description}</Text>
+              <Text style={styles.cardTitle}>{t(`breathing.techniques.${tech.id}.title`)}</Text>
+              <Text style={styles.cardDescription}>
+                {t(`breathing.techniques.${tech.id}.description`)}
+              </Text>
             </View>
           </Pressable>
         ))}

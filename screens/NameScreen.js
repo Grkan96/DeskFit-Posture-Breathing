@@ -9,10 +9,12 @@ import {
   View,
 } from 'react-native';
 import { useThemeColors } from '../lib/theme';
+import { useTranslation } from '../lib/i18n';
 
 export default function NameScreen({ onSubmit }) {
   const colors = useThemeColors();
   const styles = createStyles(colors);
+  const { t } = useTranslation();
   const [name, setName] = useState('');
   const trimmed = name.trim();
 
@@ -21,16 +23,14 @@ export default function NameScreen({ onSubmit }) {
       style={styles.container}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
-      <Text style={styles.emoji}>🧘</Text>
-      <Text style={styles.title}>Hoş geldin!</Text>
-      <Text style={styles.subtitle}>
-        Hatırlatmaları kişiselleştirebilmemiz için sana nasıl seslenelim?
-      </Text>
+      <Text style={styles.emoji}>{t('name.emoji')}</Text>
+      <Text style={styles.title}>{t('name.title')}</Text>
+      <Text style={styles.subtitle}>{t('name.subtitle')}</Text>
 
       <TextInput
         value={name}
         onChangeText={setName}
-        placeholder="İsmin"
+        placeholder={t('name.placeholder')}
         placeholderTextColor={colors.faint}
         style={styles.input}
         autoFocus
@@ -48,7 +48,7 @@ export default function NameScreen({ onSubmit }) {
           pressed && trimmed && styles.buttonPressed,
         ]}
       >
-        <Text style={styles.buttonText}>Devam Et</Text>
+        <Text style={styles.buttonText}>{t('name.continueButton')}</Text>
       </Pressable>
     </KeyboardAvoidingView>
   );

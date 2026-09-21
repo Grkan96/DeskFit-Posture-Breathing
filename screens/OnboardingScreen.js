@@ -1,36 +1,18 @@
 import { useRef, useState } from 'react';
 import { Dimensions, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useThemeColors } from '../lib/theme';
+import { useTranslation } from '../lib/i18n';
 
 const { width } = Dimensions.get('window');
-
-const SLIDES = [
-  {
-    emoji: '🧘',
-    title: 'Hoş geldin!',
-    description:
-      'Bu uygulama, düzenli aralıklarla dik oturman ve gözlerini dinlendirmen için seni nazikçe hatırlatır.',
-  },
-  {
-    emoji: '⏱️',
-    title: 'Aralığını seç',
-    description:
-      'Ana ekrandaki cetveli kaydır ya da hazır seçeneklerden birine dokun, sonra BAŞLAT\'a bas. Hepsi bu kadar.',
-  },
-  {
-    emoji: '🌿',
-    title: 'Meditasyon da var',
-    description:
-      'Nefes egzersizleri, masa başı hareketleri ve duruş güçlendirme çalışmalarıyla molalarını zenginleştirebilirsin.',
-  },
-];
 
 export default function OnboardingScreen({ onFinish }) {
   const colors = useThemeColors();
   const styles = createStyles(colors);
+  const { t } = useTranslation();
+  const slides = t('onboarding.slides');
   const [index, setIndex] = useState(0);
   const scrollRef = useRef(null);
-  const isLast = index === SLIDES.length - 1;
+  const isLast = index === slides.length - 1;
 
   function goToIndex(next) {
     scrollRef.current?.scrollTo({ x: next * width, animated: true });
@@ -60,8 +42,8 @@ export default function OnboardingScreen({ onFinish }) {
         onMomentumScrollEnd={handleScrollEnd}
         style={styles.scroll}
       >
-        {SLIDES.map((slide) => (
-          <View key={slide.title} style={[styles.slide, { width }]}>
+        {slides.map((slide, i) => (
+          <View key={i} style={[styles.slide, { width }]}>
             <Text style={styles.emoji}>{slide.emoji}</Text>
             <Text style={styles.title}>{slide.title}</Text>
             <Text style={styles.description}>{slide.description}</Text>
@@ -71,18 +53,18 @@ export default function OnboardingScreen({ onFinish }) {
 
       <View style={styles.footer}>
         <View style={styles.dots}>
-          {SLIDES.map((slide, i) => (
-            <View key={slide.title} style={[styles.dot, i === index && styles.dotActive]} />
+          {slides.map((slide, i) => (
+            <View key={i} style={[styles.dot, i === index && styles.dotActive]} />
           ))}
         </View>
 
         <Pressable onPress={handleNext} style={styles.button}>
-          <Text style={styles.buttonText}>{isLast ? 'Başla' : 'İleri'}</Text>
+          <Text style={styles.buttonText}>{isLast ? t('onboarding.start') : t('onboarding.next')}</Text>
         </Pressable>
 
         {!isLast && (
           <Pressable onPress={onFinish} hitSlop={8} style={styles.skipButton}>
-            <Text style={styles.skipText}>Geç</Text>
+            <Text style={styles.skipText}>{t('onboarding.skip')}</Text>
           </Pressable>
         )}
       </View>

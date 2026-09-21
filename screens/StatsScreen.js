@@ -2,19 +2,22 @@ import { useEffect, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { getStats, getLast7Days } from '../lib/stats';
 import { useThemeColors } from '../lib/theme';
+import { useTranslation } from '../lib/i18n';
+import { shareAchievement } from '../lib/sharing';
 
-const WEEKDAY_LABELS = ['Paz', 'Pzt', 'Sal', 'Çar', 'Per', 'Cum', 'Cmt'];
 const BAR_MAX_HEIGHT = 90;
 
 const TYPE_META = [
-  { key: 'breathing', icon: '🌬️', label: 'Nefes Dersleri' },
-  { key: 'movements', icon: '🧘', label: 'Hareketler' },
-  { key: 'exercises', icon: '💪', label: 'Egzersizler' },
+  { key: 'breathing', icon: '🌬️', labelKey: 'stats.typeBreathing' },
+  { key: 'movements', icon: '🧘', labelKey: 'stats.typeMovements' },
+  { key: 'exercises', icon: '💪', labelKey: 'stats.typeExercises' },
 ];
 
 export default function StatsScreen({ onBack }) {
   const colors = useThemeColors();
   const styles = createStyles(colors);
+  const { t } = useTranslation();
+  const weekdayLabels = t('stats.weekdays');
   const [stats, setStats] = useState(null);
 
   useEffect(() => {
@@ -31,23 +34,23 @@ export default function StatsScreen({ onBack }) {
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       <Pressable onPress={onBack} style={styles.backButton} hitSlop={10}>
-        <Text style={styles.backText}>‹ Meditasyon</Text>
+        <Text style={styles.backText}>{t('stats.backToMeditation')}</Text>
       </Pressable>
 
-      <Text style={styles.header}>İstatistiklerin</Text>
+      <Text style={styles.header}>{t('stats.header')}</Text>
 
       <View style={styles.summaryRow}>
         <View style={styles.summaryCard}>
           <Text style={styles.summaryValue}>🔥 {stats.streak}</Text>
-          <Text style={styles.summaryLabel}>gün üst üste</Text>
+          <Text style={styles.summaryLabel}>{t('stats.streakLabel')}</Text>
         </View>
         <View style={styles.summaryCard}>
           <Text style={styles.summaryValue}>✅ {stats.totalSessions}</Text>
-          <Text style={styles.summaryLabel}>toplam seans</Text>
+          <Text style={styles.summaryLabel}>{t('stats.sessionsLabel')}</Text>
         </View>
       </View>
 
-      <Text style={styles.sectionLabel}>Son 7 gün</Text>
+      <Text style={styles.sectionLabel}>{t('stats.weekSectionLabel')}</Text>
       <View style={styles.chartCard}>
         <View style={styles.chartRow}>
           {week.map((day) => {
@@ -66,7 +69,7 @@ export default function StatsScreen({ onBack }) {
                   />
                 </View>
                 <Text style={[styles.barLabel, isToday && styles.barLabelToday]}>
-                  {WEEKDAY_LABELS[day.weekday]}
+                  {weekdayLabels[day.weekday]}
                 </Text>
               </View>
             );
@@ -74,16 +77,25 @@ export default function StatsScreen({ onBack }) {
         </View>
       </View>
 
-      <Text style={styles.sectionLabel}>Türe göre</Text>
+      <Text style={styles.sectionLabel}>{t('stats.typeSectionLabel')}</Text>
       <View style={styles.typeList}>
         {TYPE_META.map((meta) => (
           <View key={meta.key} style={styles.typeRow}>
             <Text style={styles.typeIcon}>{meta.icon}</Text>
-            <Text style={styles.typeLabel}>{meta.label}</Text>
+            <Text style={styles.typeLabel}>{t(meta.labelKey)}</Text>
             <Text style={styles.typeCount}>{stats.byType[meta.key] || 0}</Text>
           </View>
         ))}
       </View>
+
+      {stats.totalSessions > 0 && (
+        <Pressable
+          onPress={() => shareAchievement({ streak: stats.streak, totalSessions: stats.totalSessions })}
+          style={styles.shareButton}
+        >
+          <Text style={styles.shareButtonText}>{t('stats.shareButton')}</Text>
+        </Pressable>
+      )}
     </ScrollView>
   );
 }
@@ -230,6 +242,18 @@ function createStyles(colors) {
       fontSize: 16,
       fontWeight: '800',
       color: colors.accent,
+    },
+    shareButton: {
+      marginTop: 20,
+      paddingVertical: 14,
+      borderRadius: 14,
+      backgroundColor: colors.accent,
+      alignItems: 'center',
+    },
+    shareButtonText: {
+      fontSize: 14,
+      fontWeight: '700',
+      color: '#ffffff',
     },
   });
 }

@@ -2,10 +2,11 @@ import { useState } from 'react';
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import TimeSlider from '../components/TimeSlider';
 import { useThemeColors } from '../lib/theme';
+import { useTranslation } from '../lib/i18n';
 
 const INTERVALS = [15, 30, 45, 60];
 const MIN_MINUTES = 1;
-const MAX_MINUTES = 60;
+const MAX_CUSTOM_MINUTES = 600;
 
 function formatHour(hour) {
   return `${String(hour).padStart(2, '0')}:00`;
@@ -24,12 +25,13 @@ export default function HomeScreen({
 }) {
   const colors = useThemeColors();
   const styles = createStyles(colors);
+  const { t } = useTranslation();
   const [customText, setCustomText] = useState('');
 
   function commitCustom() {
     const parsed = parseInt(customText, 10);
     if (Number.isFinite(parsed)) {
-      const clamped = Math.min(MAX_MINUTES, Math.max(MIN_MINUTES, parsed));
+      const clamped = Math.min(MAX_CUSTOM_MINUTES, Math.max(MIN_MINUTES, parsed));
       onIntervalCommit(clamped);
     }
     setCustomText('');
@@ -37,19 +39,18 @@ export default function HomeScreen({
 
   return (
     <View style={styles.container}>
-      <Text style={styles.greeting}>Merhaba, {userName} 👋</Text>
+      <Text style={styles.greeting}>{t('home.greeting', { name: userName })}</Text>
       <Text style={styles.subtitle}>
         {isRunning
-          ? `Aktif — her ${intervalMinutes} dakikada bir${
-              quietHoursEnabled
-                ? ` (${formatHour(quietStart)}–${formatHour(quietEnd)} sessiz)`
-                : ''
-            }`
-          : 'Kapalı — başlatmak için butona dokun'}
+          ? t('home.statusActive', { minutes: intervalMinutes }) +
+            (quietHoursEnabled
+              ? t('home.quietSuffix', { start: formatHour(quietStart), end: formatHour(quietEnd) })
+              : '')
+          : t('home.statusInactive')}
       </Text>
       {todayReminderCount > 0 && (
         <Text style={styles.reminderCount}>
-          Bugün {todayReminderCount} hatırlatma aldın 🎯
+          {t('home.reminderCount', { count: todayReminderCount })}
         </Text>
       )}
 
@@ -61,10 +62,10 @@ export default function HomeScreen({
           pressed && styles.mainButtonPressed,
         ]}
       >
-        <Text style={styles.mainButtonText}>{isRunning ? 'DURDUR' : 'BAŞLAT'}</Text>
+        <Text style={styles.mainButtonText}>{isRunning ? t('home.stop') : t('home.start')}</Text>
       </Pressable>
 
-      <Text style={styles.sectionLabel}>Hatırlatma aralığı</Text>
+      <Text style={styles.sectionLabel}>{t('home.intervalSectionLabel')}</Text>
       <View style={styles.intervalRow}>
         {INTERVALS.map((minutes) => {
           const selected = minutes === intervalMinutes;
@@ -74,7 +75,7 @@ export default function HomeScreen({
               onPress={() => onIntervalCommit(minutes)}
               accessibilityRole="button"
               accessibilityState={{ selected }}
-              accessibilityLabel={`${minutes} dakika`}
+              accessibilityLabel={t('home.minutesLabel', { minutes })}
               style={({ pressed }) => [
                 styles.chip,
                 selected && styles.chipSelected,
@@ -84,20 +85,22 @@ export default function HomeScreen({
               <Text style={[styles.chipValue, selected && styles.chipValueSelected]}>
                 {minutes}
               </Text>
-              <Text style={[styles.chipUnit, selected && styles.chipUnitSelected]}>dk</Text>
+              <Text style={[styles.chipUnit, selected && styles.chipUnitSelected]}>
+                {t('home.minuteUnit')}
+              </Text>
             </Pressable>
           );
         })}
         <TextInput
           value={customText}
-          onChangeText={(t) => setCustomText(t.replace(/[^0-9]/g, ''))}
+          onChangeText={(txt) => setCustomText(txt.replace(/[^0-9]/g, ''))}
           onSubmitEditing={commitCustom}
           onBlur={() => customText && commitCustom()}
-          placeholder="özel"
+          placeholder={t('home.customPlaceholder')}
           placeholderTextColor={colors.faint}
           keyboardType="number-pad"
           returnKeyType="done"
-          accessibilityLabel="Özel dakika gir"
+          accessibilityLabel={t('home.customInputLabel')}
           style={styles.customChip}
         />
       </View>

@@ -1,15 +1,17 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useThemeColors } from '../lib/theme';
+import { useTranslation } from '../lib/i18n';
 
 const TABS = [
-  { key: 'home', label: 'Ana Ekran', icon: '🏠' },
-  { key: 'meditation', label: 'Meditasyon', icon: '🧘' },
-  { key: 'settings', label: 'Ayarlar', icon: '⚙️' },
+  { key: 'home', labelKey: 'tabBar.home', icon: '🏠' },
+  { key: 'meditation', labelKey: 'tabBar.meditation', icon: '🧘' },
+  { key: 'settings', labelKey: 'tabBar.settings', icon: '⚙️' },
 ];
 
 export default function TabBar({ activeTab, onChange }) {
   const colors = useThemeColors();
   const styles = createStyles(colors);
+  const { t } = useTranslation();
 
   return (
     <View style={styles.bar}>
@@ -22,7 +24,7 @@ export default function TabBar({ activeTab, onChange }) {
             style={styles.tab}
           >
             <Text style={[styles.icon, active && styles.iconActive]}>{tab.icon}</Text>
-            <Text style={[styles.label, active && styles.labelActive]}>{tab.label}</Text>
+            <Text style={[styles.label, active && styles.labelActive]}>{t(tab.labelKey)}</Text>
           </Pressable>
         );
       })}

@@ -3,11 +3,14 @@ import { registerRootComponent } from 'expo';
 
 import App from './App';
 import { ThemeProvider } from './lib/theme';
+import { LocaleProvider } from './lib/i18n';
 
 function Root() {
   return (
     <ThemeProvider>
-      <App />
+      <LocaleProvider>
+        <App />
+      </LocaleProvider>
     </ThemeProvider>
   );
 }

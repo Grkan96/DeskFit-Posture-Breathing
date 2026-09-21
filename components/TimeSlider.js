@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { useThemeColors } from '../lib/theme';
+import { useTranslation } from '../lib/i18n';
 
 const MIN_MINUTES = 1;
 const MAX_MINUTES = 60;
@@ -23,6 +24,7 @@ const TICK_VALUES = Array.from(
 export default function TimeSlider({ minutes, onChange }) {
   const colors = useThemeColors();
   const styles = createStyles(colors);
+  const { t } = useTranslation();
   const scrollRef = useRef(null);
   const isDraggingRef = useRef(false);
   const lastTickRef = useRef(minutes);
@@ -76,7 +78,7 @@ export default function TimeSlider({ minutes, onChange }) {
     <View style={styles.card}>
       <View style={styles.valueRow}>
         <Text style={styles.valueNumber}>{liveMinutes}</Text>
-        <Text style={styles.valueUnit}>dakika</Text>
+        <Text style={styles.valueUnit}>{t('home.minutesWord')}</Text>
       </View>
 
       <View
@@ -100,7 +102,7 @@ export default function TimeSlider({ minutes, onChange }) {
             onScrollEndDrag={handleScrollEndDrag}
             onMomentumScrollEnd={handleMomentumScrollEnd}
             accessibilityRole="adjustable"
-            accessibilityLabel="Hatırlatma aralığı kaydırıcısı"
+            accessibilityLabel={t('home.sliderAccessibilityLabel')}
             accessibilityValue={{ min: MIN_MINUTES, max: MAX_MINUTES, now: liveMinutes }}
           >
             {TICK_VALUES.map((v) => {
