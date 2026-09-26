@@ -44,6 +44,12 @@
         }
       ],
       "expo-status-bar"
-    ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "541d91a5-55f7-4109-b5cc-21f439153929"
+      }
+    },
+    "owner": "gurkan96"
   }
 }
