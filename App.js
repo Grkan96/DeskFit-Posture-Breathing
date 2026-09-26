@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { Alert, AppState, StyleSheet, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import * as Notifications from 'expo-notifications';
+import * as Haptics from 'expo-haptics';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import {
@@ -21,6 +22,14 @@ import {
 } from './lib/notifications';
 import { initializeAds } from './lib/ads';
 import { getTodayReminderCount, incrementTodayReminderCount } from './lib/reminderLog';
+import {
+  getCheckinSummary,
+  markResponseHandled,
+  recordCheckin,
+  setDailyGoal,
+  DEFAULT_GOAL,
+} from './lib/checkins';
+import { translate } from './lib/i18n';
 import { useThemeColors } from './lib/theme';
 import NameScreen from './screens/NameScreen';
 import OnboardingScreen from './screens/OnboardingScreen';
@@ -53,6 +62,12 @@ export default function App() {
   const [quietEnd, setQuietEnd] = useState(8);
   const [eyeRestEnabled, setEyeRestEnabled] = useState(false);
   const [todayReminderCount, setTodayReminderCount] = useState(0);
+  const [checkinSummary, setCheckinSummary] = useState({
+    todayCount: 0,
+    goal: DEFAULT_GOAL,
+    streak: 0,
+    goalMetToday: false,
+  });
 
   useEffect(() => {
     // Aşağıdaki adımlardan biri (örn. bildirim API'si) hiç yanıt vermezse
@@ -116,6 +131,16 @@ export default function App() {
         setQuietEnd(settings.quietEnd);
         setEyeRestEnabled(settings.eyeRestEnabled);
         setTodayReminderCount(await getTodayReminderCount());
+        setCheckinSummary(await getCheckinSummary());
+        // Uygulama tamamen kapalıyken "Yaptım"a basıldıysa, yanıt dinleyici
+        // kurulmadan önce gelmiş olabilir; soğuk açılışta son yanıtı da
+        // kontrol et. (Çift sayımı markResponseHandled engeller.)
+        try {
+          const last = await Notifications.getLastNotificationResponseAsync();
+          if (last) await handleNotificationCheckin(last);
+        } catch (e) {
+          // Son yanıt okunamazsa bu check-in atlanır, uygulama çalışmaya devam eder.
+        }
 
         // Gerçek durumu işletim sisteminden oku: duruş hatırlatıcısı zaten
         // zamanlanmış mı? (Göz dinlendirme ayrı bir kategoride zamanlandığı
@@ -163,6 +188,73 @@ export default function App() {
     }
   }, []);
 
+  // Uygulama arka plandan dönünce (örn. ertesi gün) check-in özetini tazele,
+  // gün değiştiyse halka sıfırdan başlasın.
+  useEffect(() => {
+    try {
+      const subscription = AppState.addEventListener('change', (state) => {
+        if (state === 'active') {
+          getCheckinSummary().then(setCheckinSummary).catch(() => {});
+        }
+      });
+      return () => subscription.remove();
+    } catch (e) {
+      // AppState dinlenemezse özet sadece açılışta ve check-in'de güncellenir.
+    }
+  }, []);
+
+  // Bildirim yanıtından check-in kaydet. Sadece "Yaptım" (DONE_ACTION) sayılır;
+  // bildirimin gövdesine dokunmak (DEFAULT_ACTION_IDENTIFIER) sadece "gördüm"
+  // anlamına gelir ve check-in sayılmaz.
+  async function handleNotificationCheckin(response) {
+    if (!response || response.actionIdentifier !== DONE_ACTION) return;
+    const requestId = response.notification?.request?.identifier;
+    const responseId = requestId
+      ? `${requestId}:${response.actionIdentifier}`
+      : null;
+    const isNew = await markResponseHandled(responseId);
+    if (!isNew) return;
+    await applyCheckin();
+  }
+
+  async function applyCheckin() {
+    try {
+      const result = await recordCheckin();
+      setCheckinSummary(result);
+      if (result.justReachedGoal) {
+        try {
+          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+        } catch (e) {
+          // Titreşim desteklenmiyorsa sessizce geç.
+        }
+        Alert.alert(
+          translate('checkin.goalReachedTitle'),
+          translate('checkin.goalReachedBody', { goal: result.goal }),
+          [{ text: translate('sharing.closeCta') }]
+        );
+      }
+    } catch (e) {
+      // Kayıt başarısız olursa uygulama çökmesin.
+    }
+  }
+
+  async function handleManualCheckin() {
+    try {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+    } catch (e) {
+      // Titreşim desteklenmiyorsa sessizce geç.
+    }
+    await applyCheckin();
+  }
+
+  async function handleDailyGoalChange(goal) {
+    try {
+      setCheckinSummary(await setDailyGoal(goal));
+    } catch (e) {
+      // Hedef kaydedilemezse eski değer kalır.
+    }
+  }
+
   // Bildirimdeki "Ertele"/"Yaptım" butonlarına basılınca çalışır. Güncel
   // ayarları kullanabilmek için alertMode/vibrationIntensity/userName
   // değiştikçe dinleyici yeniden kurulur (eski değerlere takılı kalmasın diye).
@@ -173,7 +265,11 @@ export default function App() {
         if (action === SNOOZE_ACTION) {
           scheduleSnooze({ alertMode, vibrationIntensity, userName });
         }
-        // DONE_ACTION için ek bir işlem gerekmiyor, bildirim kendiliğinden kapanır.
+        // "Yaptım" -> duruş check-in'i. Gövdeye dokunma (varsayılan eylem)
+        // check-in sayılmaz, handleNotificationCheckin bunu kendi eler.
+        if (action === DONE_ACTION) {
+          handleNotificationCheckin(response);
+        }
       });
       return () => subscription.remove();
     } catch (e) {
@@ -379,6 +475,10 @@ export default function App() {
                 quietStart={quietStart}
                 quietEnd={quietEnd}
                 todayReminderCount={todayReminderCount}
+                checkinCount={checkinSummary.todayCount}
+                dailyGoal={checkinSummary.goal}
+                checkinStreak={checkinSummary.streak}
+                onCheckin={handleManualCheckin}
                 onStartStop={handleStartStop}
                 onIntervalCommit={handleIntervalCommit}
               />
@@ -403,6 +503,8 @@ export default function App() {
                 onQuietEndChange={handleQuietEndChange}
                 eyeRestEnabled={eyeRestEnabled}
                 onEyeRestToggle={handleEyeRestToggle}
+                dailyGoal={checkinSummary.goal}
+                onDailyGoalChange={handleDailyGoalChange}
                 onTestNotification={handleTestNotification}
               />
             )}
