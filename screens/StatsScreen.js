@@ -4,6 +4,7 @@ import { getStats, getLast7Days } from '../lib/stats';
 import { useThemeColors } from '../lib/theme';
 import { useTranslation } from '../lib/i18n';
 import { shareAchievement } from '../lib/sharing';
+import { openSharePreview } from '../lib/sharePreview';
 
 const BAR_MAX_HEIGHT = 90;
 
@@ -90,7 +91,11 @@ export default function StatsScreen({ onBack }) {
 
       {stats.totalSessions > 0 && (
         <Pressable
-          onPress={() => shareAchievement({ streak: stats.streak, totalSessions: stats.totalSessions })}
+          onPress={() => {
+            const payload = { streak: stats.streak, totalSessions: stats.totalSessions, history: stats.history };
+            // Görsel kart önizlemesi açılamazsa düz metin paylaşımına düş
+            if (!openSharePreview(payload)) shareAchievement(payload);
+          }}
           style={styles.shareButton}
         >
           <Text style={styles.shareButtonText}>{t('stats.shareButton')}</Text>
