@@ -1,0 +1,23 @@
+import assert from 'node:assert/strict';
+import { ringFraction, displayStreak, remainingFromTarget, countdownProgress } from '../lib/homeProgress.js';
+import { localDayKey, addDays } from '../lib/dayStreak.js';
+
+assert.equal(ringFraction(0), 0);
+assert.equal(ringFraction(1), 1 / 3);
+assert.equal(ringFraction(5), 1);
+assert.equal(ringFraction(2, 0), 0);
+assert.equal(ringFraction(NaN), 0);
+const now = new Date(2026, 5, 15, 12);
+const k = (n) => localDayKey(addDays(now, n));
+assert.equal(displayStreak({ streak: 4, lastCompletedDate: k(0) }, now), 4);
+assert.equal(displayStreak({ streak: 4, lastCompletedDate: k(-1) }, now), 4);
+assert.equal(displayStreak({ streak: 4, lastCompletedDate: k(-2) }, now), 0);
+assert.equal(displayStreak({ streak: 0, lastCompletedDate: k(0) }, now), 0);
+assert.equal(displayStreak(null, now), 0);
+assert.equal(remainingFromTarget(undefined), null);
+assert.equal(remainingFromTarget(null), null);
+assert.equal(remainingFromTarget(10500, 1000), 10);
+assert.equal(remainingFromTarget(500, 1000), 0);
+assert.ok(Math.abs(countdownProgress(300, 900) - 2 / 3) < 1e-9);
+assert.equal(countdownProgress(0, 0), 0);
+console.log('homeprogress ok');
