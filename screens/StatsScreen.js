@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { getStats, getLast7Days, startPostureChallenge } from '../lib/stats';
+import { getStats, getLast7Days, startPostureChallenge, todayKey } from '../lib/stats';
 import { useThemeColors } from '../lib/theme';
 import { useTranslation } from '../lib/i18n';
 import { shareAchievement, shareBadge, shareChallenge } from '../lib/sharing';
@@ -31,7 +31,7 @@ export default function StatsScreen({ onBack }) {
   }
 
   const challenge = stats.challenge;
-  const todayDone = challenge.doneDates.includes(new Date().toISOString().slice(0, 10));
+  const todayDone = challenge.doneDates.includes(todayKey());
   const progressPct = Math.min(100, (challenge.doneDates.length / CHALLENGE_DAYS) * 100);
   const unlockedCount = ACHIEVEMENTS.filter((a) => stats.achievements[a.id]).length;
 
