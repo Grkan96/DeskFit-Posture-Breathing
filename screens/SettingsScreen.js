@@ -14,6 +14,13 @@ const THEME_MODES = [
 const LANGUAGE_MODES = [
   { key: 'tr', label: 'Türkçe' },
   { key: 'en', label: 'English' },
+  { key: 'es', label: 'Español' },
+  { key: 'de', label: 'Deutsch' },
+  { key: 'pt', label: 'Português' },
+  { key: 'fr', label: 'Français' },
+  { key: 'ru', label: 'Русский' },
+  { key: 'hi', label: 'हिन्दी' },
+  { key: 'id', label: 'Indonesia' },
 ];
 
 const ALERT_MODES = [
@@ -42,9 +49,9 @@ function formatMinutes(minutes) {
   return `${h}:${m}`;
 }
 
-function SegmentedControl({ styles, options, value, onChange, t }) {
+function SegmentedControl({ styles, options, value, onChange, t, wrap }) {
   return (
-    <View style={styles.segmentRow}>
+    <View style={[styles.segmentRow, wrap && styles.segmentRowWrap]}>
       {options.map((option) => {
         const selected = option.key === value;
         const label = option.labelKey ? t(option.labelKey) : option.label;
@@ -55,7 +62,7 @@ function SegmentedControl({ styles, options, value, onChange, t }) {
             accessibilityRole="button"
             accessibilityState={{ selected }}
             accessibilityLabel={label}
-            style={[styles.segment, selected && styles.segmentSelected]}
+            style={[styles.segment, wrap && styles.segmentWrap, selected && styles.segmentSelected]}
           >
             {option.icon && (
               <Text style={styles.segmentIcon}>{option.icon}</Text>
@@ -203,6 +210,7 @@ export default function SettingsScreen({
           value={locale}
           onChange={setLocale}
           t={t}
+          wrap
         />
       </View>
 
@@ -434,6 +442,13 @@ function createStyles(colors) {
       flexDirection: 'row',
       gap: 8,
       marginTop: 10,
+    },
+    segmentRowWrap: {
+      flexWrap: 'wrap',
+    },
+    segmentWrap: {
+      flexGrow: 1,
+      flexBasis: '30%',
     },
     segment: {
       flex: 1,
