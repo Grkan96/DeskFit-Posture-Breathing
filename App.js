@@ -508,9 +508,13 @@ export default function App() {
     await refreshStreakAlerts({ streakAlert: next });
   }
 
-  async function handleOnboardingFinish() {
+  async function handleOnboardingFinish(result) {
     setOnboardingSeen(true);
     await AsyncStorage.setItem(ONBOARDING_KEY, 'true').catch(() => {});
+    // Onboarding'in son adımında "ilk hatırlatmayı şimdi başlat" seçildiyse.
+    if (result && result.startReminder && !isRunning) {
+      await handleStartStop();
+    }
   }
 
   async function handleTestNotification() {
