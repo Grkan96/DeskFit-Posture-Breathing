@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { useEffect, useRef, useState } from 'react';
+import { AppState, StyleSheet, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
@@ -19,12 +19,15 @@ import {
   DONE_ACTION,
 } from './lib/notifications';
 import { initializeAds } from './lib/ads';
-import { getTodayReminderCount, incrementTodayReminderCount } from './lib/reminderLog';
+import { reconcileDeliveredReminders, recordReminderAction } from './lib/reminderLog';
 import { useThemeColors } from './lib/theme';
+import { useTranslation } from './lib/i18n';
+import LanguageScreen from './screens/LanguageScreen';
 import NameScreen from './screens/NameScreen';
 import OnboardingScreen from './screens/OnboardingScreen';
 import HomeScreen from './screens/HomeScreen';
 import MeditationScreen from './screens/MeditationScreen';
+import StatsScreen from './screens/StatsScreen';
 import SettingsScreen from './screens/SettingsScreen';
 import TabBar from './components/TabBar';
 
@@ -36,6 +39,8 @@ const INTERVALS = [15, 30, 45, 60];
 export default function App() {
   const colors = useThemeColors();
   const styles = createStyles(colors);
+  const { locale, localeReady, localeChosen } = useTranslation();
+  const appliedLocaleRef = useRef(null);
   const [bootstrapped, setBootstrapped] = useState(false);
   const [userName, setUserName] = useState('');
   const [onboardingSeen, setOnboardingSeen] = useState(false);
@@ -52,6 +57,10 @@ export default function App() {
   const [todayReminderCount, setTodayReminderCount] = useState(0);
 
   useEffect(() => {
+    // Kayıtlı dil okunmadan başlamayalım: bildirim kanalları/mesajları doğru
+    // dilde kurulsun.
+    if (!localeReady) return;
+    appliedLocaleRef.current = locale;
     // Aşağıdaki adımlardan biri (örn. bildirim API'si) hiç yanıt vermezse
     // uygulama sonsuza kadar "yükleniyor" ekranında kalmasın diye emniyet.
     const failSafe = setTimeout(() => setBootstrapped(true), 4000);
@@ -112,7 +121,7 @@ export default function App() {
         setQuietStart(settings.quietStart);
         setQuietEnd(settings.quietEnd);
         setEyeRestEnabled(settings.eyeRestEnabled);
-        setTodayReminderCount(await getTodayReminderCount());
+        setTodayReminderCount(await reconcileDeliveredReminders());
 
         // Gerçek durumu işletim sisteminden oku: duruş hatırlatıcısı zaten
         // zamanlanmış mı? (Göz dinlendirme ayrı bir kategoride zamanlandığı
@@ -140,15 +149,56 @@ export default function App() {
       setBootstrapped(true);
     })();
     return () => clearTimeout(failSafe);
-  }, []);
+  }, [localeReady]);
 
-  // Bir duruş hatırlatma bildirimi ulaştığında günlük sayacı artır.
+  // Zamanı gelen hatırlatmaları (uygulama kapalıyken gelenler dahil) teslim
+  // edilmiş sayar; günlük sayaç ve İstatistikler ekranı bundan beslenir.
+  // Uygulama açıkken 30 sn'de bir, arka plandan dönünce de hemen çalışır.
+  useEffect(() => {
+    if (!bootstrapped) return;
+    const refresh = () => {
+      reconcileDeliveredReminders()
+        .then(setTodayReminderCount)
+        .catch(() => {});
+    };
+    refresh();
+    const interval = setInterval(refresh, 30000);
+    const appStateSub = AppState.addEventListener('change', (state) => {
+      if (state === 'active') refresh();
+    });
+    return () => {
+      clearInterval(interval);
+      appStateSub.remove();
+    };
+  }, [bootstrapped]);
+
+  // Kullanıcı dili değiştirince bildirim kanal/buton adları ve zamanlanmış
+  // hatırlatma mesajları da yeni dilde yeniden kurulur.
+  useEffect(() => {
+    if (!bootstrapped || !localeChosen) return;
+    if (appliedLocaleRef.current === locale) return;
+    appliedLocaleRef.current = locale;
+    (async () => {
+      try {
+        await ensureChannels();
+        await ensureNotificationCategories();
+        if (isRunning) await scheduleReminder(currentSettings());
+        if (eyeRestEnabled) await refreshEyeRest();
+      } catch (e) {
+        // Yeniden kurulamazsa bir sonraki açılışta düzelir.
+      }
+    })();
+  }, [locale, bootstrapped, localeChosen]);
+
+  // Bir duruş hatırlatma bildirimi ulaştığında günlük sayacı güncelle.
   // Dinleyici kurulumu (native modül tarafında) beklenmedik şekilde hata
   // verirse bile bu, tüm uygulamayı çökertmesin diye try/catch ile sarıldı.
   useEffect(() => {
     try {
       const subscription = Notifications.addNotificationReceivedListener(() => {
-        incrementTodayReminderCount().then(setTodayReminderCount);
+        reconcileDeliveredReminders()
+          .then(setTodayReminderCount)
+          .catch(() => {});
       });
       return () => subscription.remove();
     } catch (e) {
@@ -166,8 +216,10 @@ export default function App() {
         const action = response.actionIdentifier;
         if (action === SNOOZE_ACTION) {
           scheduleSnooze({ alertMode, vibrationIntensity, userName });
+        } else if (action === DONE_ACTION) {
+          // Bildirim kendiliğinden kapanır; "Yaptım" İstatistikler'e yazılır.
+          recordReminderAction('done');
         }
-        // DONE_ACTION için ek bir işlem gerekmiyor, bildirim kendiliğinden kapanır.
       });
       return () => subscription.remove();
     } catch (e) {
@@ -322,11 +374,25 @@ export default function App() {
     await sendTestNotification({ alertMode, vibrationIntensity, userName });
   }
 
-  if (!bootstrapped) {
+  if (!bootstrapped || !localeReady) {
     return (
       <GestureHandlerRootView style={styles.blank}>
         <SafeAreaProvider>
           <View style={styles.blank} />
+        </SafeAreaProvider>
+      </GestureHandlerRootView>
+    );
+  }
+
+  // İlk açılışta (henüz dil seçilmediyse) önce dil seçtirilir.
+  if (!localeChosen) {
+    return (
+      <GestureHandlerRootView style={styles.blank}>
+        <SafeAreaProvider>
+          <SafeAreaView style={styles.blank} edges={['top', 'bottom']}>
+            <StatusBar style="auto" />
+            <LanguageScreen />
+          </SafeAreaView>
         </SafeAreaProvider>
       </GestureHandlerRootView>
     );
@@ -378,6 +444,7 @@ export default function App() {
               />
             )}
             {activeTab === 'meditation' && <MeditationScreen />}
+            {activeTab === 'stats' && <StatsScreen />}
             {activeTab === 'settings' && (
               <SettingsScreen
                 userName={userName}

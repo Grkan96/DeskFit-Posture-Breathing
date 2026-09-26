@@ -2,18 +2,13 @@ import { useState } from 'react';
 import { Alert, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
 import AdBanner from '../components/AdBanner';
 import { useThemeColors, useThemePreference } from '../lib/theme';
-import { useTranslation } from '../lib/i18n';
+import { LANGUAGES, useTranslation } from '../lib/i18n';
 import { shareApp } from '../lib/sharing';
 
 const THEME_MODES = [
   { key: 'system', labelKey: 'settings.themeSystem', icon: '🌓' },
   { key: 'light', labelKey: 'settings.themeLight', icon: '☀️' },
   { key: 'dark', labelKey: 'settings.themeDark', icon: '🌙' },
-];
-
-const LANGUAGE_MODES = [
-  { key: 'tr', label: 'Türkçe' },
-  { key: 'en', label: 'English' },
 ];
 
 const ALERT_MODES = [
@@ -149,13 +144,26 @@ export default function SettingsScreen({
 
       <View style={styles.card}>
         <Text style={styles.settingLabel}>{t('settings.languageLabel')}</Text>
-        <SegmentedControl
-          styles={styles}
-          options={LANGUAGE_MODES}
-          value={locale}
-          onChange={setLocale}
-          t={t}
-        />
+        <View style={styles.languageGrid}>
+          {LANGUAGES.map((language) => {
+            const selected = language.code === locale;
+            return (
+              <Pressable
+                key={language.code}
+                onPress={() => setLocale(language.code)}
+                accessibilityRole="button"
+                accessibilityState={{ selected }}
+                accessibilityLabel={language.nativeName}
+                style={[styles.languageChip, selected && styles.languageChipSelected]}
+              >
+                <Text style={styles.languageFlag}>{language.flag}</Text>
+                <Text style={[styles.languageName, selected && styles.languageNameSelected]}>
+                  {language.nativeName}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </View>
       </View>
 
       <View style={styles.card}>
@@ -316,6 +324,35 @@ function createStyles(colors) {
     },
     segmentSelected: {
       backgroundColor: colors.accent,
+    },
+    languageGrid: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: 8,
+      marginTop: 10,
+    },
+    languageChip: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+      paddingVertical: 8,
+      paddingHorizontal: 12,
+      borderRadius: 999,
+      backgroundColor: colors.inputBg,
+    },
+    languageChipSelected: {
+      backgroundColor: colors.accent,
+    },
+    languageFlag: {
+      fontSize: 16,
+    },
+    languageName: {
+      fontSize: 13,
+      fontWeight: '600',
+      color: colors.subtext,
+    },
+    languageNameSelected: {
+      color: '#ffffff',
     },
     segmentIcon: {
       fontSize: 16,
