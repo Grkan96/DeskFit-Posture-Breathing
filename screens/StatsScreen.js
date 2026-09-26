@@ -4,6 +4,7 @@ import { getStats, getLast7Days } from '../lib/stats';
 import { useThemeColors } from '../lib/theme';
 import { useTranslation } from '../lib/i18n';
 import { shareAchievement } from '../lib/sharing';
+import { computeAchievements } from '../lib/achievements';
 
 const BAR_MAX_HEIGHT = 90;
 
@@ -11,6 +12,7 @@ const TYPE_META = [
   { key: 'breathing', icon: '🌬️', labelKey: 'stats.typeBreathing' },
   { key: 'movements', icon: '🧘', labelKey: 'stats.typeMovements' },
   { key: 'exercises', icon: '💪', labelKey: 'stats.typeExercises' },
+  { key: 'eyes', icon: '👀', labelKey: 'stats.typeEyes' },
 ];
 
 export default function StatsScreen({ onBack }) {
@@ -30,6 +32,8 @@ export default function StatsScreen({ onBack }) {
 
   const week = getLast7Days(stats.history);
   const maxCount = Math.max(1, ...week.map((d) => d.count));
+  const achievements = computeAchievements(stats);
+  const unlockedCount = achievements.filter((a) => a.unlocked).length;
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
@@ -84,6 +88,36 @@ export default function StatsScreen({ onBack }) {
             <Text style={styles.typeIcon}>{meta.icon}</Text>
             <Text style={styles.typeLabel}>{t(meta.labelKey)}</Text>
             <Text style={styles.typeCount}>{stats.byType[meta.key] || 0}</Text>
+          </View>
+        ))}
+      </View>
+
+      {/* Rozetler: kilitli olanlar soluk + ilerleme çubuğu ile gösterilir */}
+      <Text style={[styles.sectionLabel, styles.badgeSectionLabel]}>
+        {`${t('achievements.sectionLabel')} (${unlockedCount}/${achievements.length})`}
+      </Text>
+      <View style={styles.badgeGrid}>
+        {achievements.map((badge) => (
+          <View
+            key={badge.id}
+            style={[styles.badgeCard, !badge.unlocked && styles.badgeCardLocked]}
+          >
+            <Text style={[styles.badgeIcon, !badge.unlocked && styles.badgeIconLocked]}>
+              {badge.icon}
+            </Text>
+            <Text style={styles.badgeTitle} numberOfLines={2}>
+              {t(`achievements.items.${badge.id}.title`)}
+            </Text>
+            <Text style={styles.badgeDescription} numberOfLines={2}>
+              {t(`achievements.items.${badge.id}.description`)}
+            </Text>
+            {!badge.unlocked && (
+              <View style={styles.badgeProgressTrack}>
+                <View
+                  style={[styles.badgeProgressFill, { width: `${Math.round(badge.progress * 100)}%` }]}
+                />
+              </View>
+            )}
           </View>
         ))}
       </View>
@@ -242,6 +276,63 @@ function createStyles(colors) {
       fontSize: 16,
       fontWeight: '800',
       color: colors.accent,
+    },
+    badgeSectionLabel: {
+      marginTop: 24,
+    },
+    badgeGrid: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      justifyContent: 'space-between',
+      rowGap: 10,
+    },
+    badgeCard: {
+      width: '31%',
+      backgroundColor: colors.surface,
+      borderRadius: 14,
+      paddingHorizontal: 8,
+      paddingVertical: 12,
+      alignItems: 'center',
+      elevation: 1,
+      shadowColor: '#000',
+      shadowOpacity: 0.05,
+      shadowRadius: 4,
+      shadowOffset: { width: 0, height: 1 },
+    },
+    badgeCardLocked: {
+      opacity: 0.5,
+    },
+    badgeIcon: {
+      fontSize: 26,
+    },
+    badgeIconLocked: {
+      opacity: 0.4,
+    },
+    badgeTitle: {
+      marginTop: 6,
+      fontSize: 11,
+      fontWeight: '700',
+      color: colors.text,
+      textAlign: 'center',
+    },
+    badgeDescription: {
+      marginTop: 2,
+      fontSize: 9,
+      color: colors.muted,
+      textAlign: 'center',
+    },
+    badgeProgressTrack: {
+      alignSelf: 'stretch',
+      height: 4,
+      borderRadius: 2,
+      marginTop: 8,
+      backgroundColor: colors.border,
+      overflow: 'hidden',
+    },
+    badgeProgressFill: {
+      height: 4,
+      borderRadius: 2,
+      backgroundColor: colors.accent,
     },
     shareButton: {
       marginTop: 20,
