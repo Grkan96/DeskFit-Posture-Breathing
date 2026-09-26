@@ -15,6 +15,7 @@ import {
   scheduleSnooze,
   sendTestNotification,
   setEyeRestReminders,
+  FOCUS_CATEGORY,
   SNOOZE_ACTION,
   DONE_ACTION,
 } from './lib/notifications';
@@ -24,6 +25,7 @@ import { useThemeColors } from './lib/theme';
 import NameScreen from './screens/NameScreen';
 import OnboardingScreen from './screens/OnboardingScreen';
 import HomeScreen from './screens/HomeScreen';
+import FocusScreen from './screens/FocusScreen';
 import MeditationScreen from './screens/MeditationScreen';
 import SettingsScreen from './screens/SettingsScreen';
 import TabBar from './components/TabBar';
@@ -148,7 +150,10 @@ export default function App() {
   // verirse bile bu, tüm uygulamayı çökertmesin diye try/catch ile sarıldı.
   useEffect(() => {
     try {
-      const subscription = Notifications.addNotificationReceivedListener(() => {
+      const subscription = Notifications.addNotificationReceivedListener((notification) => {
+        // Odak zamanlayıcısının "mola başladı" bildirimi hatırlatma sayılmaz.
+        const category = notification?.request?.content?.categoryIdentifier;
+        if (category === FOCUS_CATEGORY) return;
         incrementTodayReminderCount().then(setTodayReminderCount);
       });
       return () => subscription.remove();
@@ -377,6 +382,9 @@ export default function App() {
                 onStartStop={handleStartStop}
                 onIntervalCommit={handleIntervalCommit}
               />
+            )}
+            {activeTab === 'focus' && (
+              <FocusScreen onOpenMeditation={() => setActiveTab('meditation')} />
             )}
             {activeTab === 'meditation' && <MeditationScreen />}
             {activeTab === 'settings' && (
