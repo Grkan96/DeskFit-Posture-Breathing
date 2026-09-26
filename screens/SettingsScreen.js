@@ -11,9 +11,14 @@ const THEME_MODES = [
   { key: 'dark', labelKey: 'settings.themeDark', icon: '🌙' },
 ];
 
+// Her dil kendi adıyla gösterilir. 5 seçenek tek satıra sığmadığı için
+// liste iki satıra sarılır (3 + 2).
 const LANGUAGE_MODES = [
   { key: 'tr', label: 'Türkçe' },
   { key: 'en', label: 'English' },
+  { key: 'es', label: 'Español' },
+  { key: 'de', label: 'Deutsch' },
+  { key: 'pt', label: 'Português' },
 ];
 
 const ALERT_MODES = [
@@ -32,9 +37,9 @@ function formatHour(hour) {
   return `${String(hour).padStart(2, '0')}:00`;
 }
 
-function SegmentedControl({ styles, options, value, onChange, t }) {
+function SegmentedControl({ styles, options, value, onChange, t, wrap = false }) {
   return (
-    <View style={styles.segmentRow}>
+    <View style={[styles.segmentRow, wrap && styles.segmentRowWrap]}>
       {options.map((option) => {
         const selected = option.key === value;
         const label = option.labelKey ? t(option.labelKey) : option.label;
@@ -45,7 +50,11 @@ function SegmentedControl({ styles, options, value, onChange, t }) {
             accessibilityRole="button"
             accessibilityState={{ selected }}
             accessibilityLabel={label}
-            style={[styles.segment, selected && styles.segmentSelected]}
+            style={[
+              styles.segment,
+              wrap && styles.segmentWrap,
+              selected && styles.segmentSelected,
+            ]}
           >
             {option.icon && (
               <Text style={styles.segmentIcon}>{option.icon}</Text>
@@ -155,6 +164,7 @@ export default function SettingsScreen({
           value={locale}
           onChange={setLocale}
           t={t}
+          wrap
         />
       </View>
 
@@ -313,6 +323,14 @@ function createStyles(colors) {
       backgroundColor: colors.inputBg,
       alignItems: 'center',
       gap: 2,
+    },
+    segmentRowWrap: {
+      flexWrap: 'wrap',
+    },
+    segmentWrap: {
+      // Satır başına 3 öğe; ikinci satırdaki 2 öğe genişliği paylaşır.
+      flexBasis: '30%',
+      flexGrow: 1,
     },
     segmentSelected: {
       backgroundColor: colors.accent,

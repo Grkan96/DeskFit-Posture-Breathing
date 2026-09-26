@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
@@ -21,6 +21,7 @@ import {
 import { initializeAds } from './lib/ads';
 import { getTodayReminderCount, incrementTodayReminderCount } from './lib/reminderLog';
 import { useThemeColors } from './lib/theme';
+import { useTranslation } from './lib/i18n';
 import NameScreen from './screens/NameScreen';
 import OnboardingScreen from './screens/OnboardingScreen';
 import HomeScreen from './screens/HomeScreen';
@@ -36,6 +37,11 @@ const INTERVALS = [15, 30, 45, 60];
 export default function App() {
   const colors = useThemeColors();
   const styles = createStyles(colors);
+  const { locale } = useTranslation();
+  // Bildirimlerin en son hangi dilde kurulduğunu tutar; dil değişince
+  // zamanlanmış bildirimler yeni dilde yeniden oluşturulur.
+  const notificationLocaleRef = useRef(locale);
+  const localeJobRef = useRef(Promise.resolve());
   const [bootstrapped, setBootstrapped] = useState(false);
   const [userName, setUserName] = useState('');
   const [onboardingSeen, setOnboardingSeen] = useState(false);
@@ -175,6 +181,35 @@ export default function App() {
       // uygulama çökmez.
     }
   }, [alertMode, vibrationIntensity, userName]);
+
+  // Dil değişince: bildirim metinleri zamanlama anında translate() ile
+  // üretildiği için, kuyruktaki bildirimler eski dilde kalırdı. Kanal adlarını,
+  // "Ertele"/"Yaptım" buton başlıklarını ve aktif hatırlatıcıları yeni dilde
+  // yeniden kur. Açılış (bootstrap) bitmeden çalışmaz; ardışık hızlı dil
+  // değişimlerinde işler üst üste binmesin diye sıraya alınır.
+  useEffect(() => {
+    if (!bootstrapped) return;
+    if (notificationLocaleRef.current === locale) return;
+    notificationLocaleRef.current = locale;
+    const settings = currentSettings();
+    const eyeRest = eyeRestEnabled;
+    const running = isRunning;
+    localeJobRef.current = localeJobRef.current.then(async () => {
+      try {
+        await ensureChannels();
+        await ensureNotificationCategories();
+        if (running) {
+          await scheduleReminder(settings);
+        }
+        if (eyeRest) {
+          await refreshEyeRest({ enabled: true });
+        }
+      } catch (e) {
+        // Yeniden zamanlama başarısız olursa bildirimler eski dilde kalır,
+        // uygulama çalışmaya devam eder.
+      }
+    });
+  }, [bootstrapped, locale]);
 
   useEffect(() => {
     if (!bootstrapped) return;
