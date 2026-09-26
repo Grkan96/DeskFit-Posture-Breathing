@@ -33,6 +33,7 @@ export default function NameScreen({ onSubmit }) {
         placeholder={t('name.placeholder')}
         placeholderTextColor={colors.faint}
         style={styles.input}
+        accessibilityLabel={t('name.placeholder')}
         autoFocus
         maxLength={24}
         returnKeyType="done"
@@ -42,6 +43,9 @@ export default function NameScreen({ onSubmit }) {
       <Pressable
         onPress={() => trimmed && onSubmit(trimmed)}
         disabled={!trimmed}
+        accessibilityRole="button"
+        accessibilityLabel={t('name.continueButton')}
+        accessibilityState={{ disabled: !trimmed }}
         style={({ pressed }) => [
           styles.button,
           !trimmed && styles.buttonDisabled,
@@ -64,12 +68,13 @@ function createStyles(colors) {
       paddingHorizontal: 32,
     },
     emoji: {
-      fontSize: 40,
-      marginBottom: 8,
+      fontSize: 48,
+      marginBottom: 12,
     },
     title: {
-      fontSize: 24,
-      fontWeight: '700',
+      fontSize: 28,
+      fontWeight: '800',
+      letterSpacing: -0.3,
       color: colors.text,
     },
     subtitle: {
@@ -83,13 +88,16 @@ function createStyles(colors) {
       marginTop: 28,
       alignSelf: 'stretch',
       backgroundColor: colors.surface,
-      borderRadius: 14,
+      borderRadius: 16,
+      borderWidth: 1.5,
+      borderColor: colors.borderStrong,
+      minHeight: 52,
       paddingHorizontal: 18,
       paddingVertical: 14,
-      fontSize: 16,
+      fontSize: 17,
       color: colors.text,
       elevation: 2,
-      shadowColor: '#000',
+      shadowColor: colors.shadow,
       shadowOpacity: 0.06,
       shadowRadius: 6,
       shadowOffset: { width: 0, height: 2 },
@@ -98,18 +106,21 @@ function createStyles(colors) {
       marginTop: 16,
       alignSelf: 'stretch',
       backgroundColor: colors.accent,
-      borderRadius: 14,
+      borderRadius: 16,
+      minHeight: 52,
       paddingVertical: 14,
       alignItems: 'center',
+      justifyContent: 'center',
     },
     buttonDisabled: {
       backgroundColor: colors.borderStrong,
+      opacity: 0.7,
     },
     buttonPressed: {
       opacity: 0.85,
     },
     buttonText: {
-      color: '#ffffff',
+      color: colors.onAccent,
       fontSize: 16,
       fontWeight: '700',
     },

@@ -1,5 +1,6 @@
 import { useRef, useState } from 'react';
 import { Dimensions, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import * as Haptics from 'expo-haptics';
 import { useThemeColors } from '../lib/theme';
 import { useTranslation } from '../lib/i18n';
 
@@ -44,26 +45,49 @@ export default function OnboardingScreen({ onFinish }) {
       >
         {slides.map((slide, i) => (
           <View key={i} style={[styles.slide, { width }]}>
-            <Text style={styles.emoji}>{slide.emoji}</Text>
-            <Text style={styles.title}>{slide.title}</Text>
+            <View style={styles.emojiCircle}>
+              <Text style={styles.emoji}>{slide.emoji}</Text>
+            </View>
+            <Text style={styles.title} accessibilityRole="header">
+              {slide.title}
+            </Text>
             <Text style={styles.description}>{slide.description}</Text>
           </View>
         ))}
       </ScrollView>
 
       <View style={styles.footer}>
-        <View style={styles.dots}>
+        <View
+          style={styles.dots}
+          accessible
+          accessibilityRole="progressbar"
+          accessibilityValue={{ min: 1, max: slides.length, now: index + 1 }}
+        >
           {slides.map((slide, i) => (
             <View key={i} style={[styles.dot, i === index && styles.dotActive]} />
           ))}
         </View>
 
-        <Pressable onPress={handleNext} style={styles.button}>
+        <Pressable
+          onPress={() => {
+            Haptics.selectionAsync().catch(() => {});
+            handleNext();
+          }}
+          accessibilityRole="button"
+          accessibilityLabel={isLast ? t('onboarding.start') : t('onboarding.next')}
+          style={({ pressed }) => [styles.button, pressed && styles.buttonPressed]}
+        >
           <Text style={styles.buttonText}>{isLast ? t('onboarding.start') : t('onboarding.next')}</Text>
         </Pressable>
 
         {!isLast && (
-          <Pressable onPress={onFinish} hitSlop={8} style={styles.skipButton}>
+          <Pressable
+            onPress={onFinish}
+            hitSlop={8}
+            accessibilityRole="button"
+            accessibilityLabel={t('onboarding.skip')}
+            style={styles.skipButton}
+          >
             <Text style={styles.skipText}>{t('onboarding.skip')}</Text>
           </Pressable>
         )}
@@ -86,22 +110,36 @@ function createStyles(colors) {
       justifyContent: 'center',
       paddingHorizontal: 32,
     },
+    emojiCircle: {
+      width: 132,
+      height: 132,
+      borderRadius: 66,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginBottom: 28,
+      backgroundColor: colors.accentSofter,
+      elevation: 4,
+      shadowColor: colors.shadow,
+      shadowOpacity: 0.12,
+      shadowRadius: 14,
+      shadowOffset: { width: 0, height: 6 },
+    },
     emoji: {
       fontSize: 64,
-      marginBottom: 20,
     },
     title: {
-      fontSize: 22,
-      fontWeight: '700',
+      fontSize: 26,
+      fontWeight: '800',
+      letterSpacing: -0.3,
       color: colors.text,
       textAlign: 'center',
     },
     description: {
       marginTop: 10,
-      fontSize: 14,
+      fontSize: 16,
       color: colors.subtext,
       textAlign: 'center',
-      lineHeight: 21,
+      lineHeight: 24,
     },
     footer: {
       paddingHorizontal: 32,
@@ -117,7 +155,7 @@ function createStyles(colors) {
       width: 8,
       height: 8,
       borderRadius: 4,
-      backgroundColor: colors.border,
+      backgroundColor: colors.borderStrong,
     },
     dotActive: {
       backgroundColor: colors.accent,
@@ -126,23 +164,31 @@ function createStyles(colors) {
     button: {
       alignSelf: 'stretch',
       backgroundColor: colors.accent,
-      borderRadius: 14,
+      borderRadius: 16,
+      minHeight: 52,
       paddingVertical: 14,
       alignItems: 'center',
+      justifyContent: 'center',
+    },
+    buttonPressed: {
+      opacity: 0.85,
+      transform: [{ scale: 0.98 }],
     },
     buttonText: {
-      color: '#ffffff',
+      color: colors.onAccent,
       fontSize: 16,
       fontWeight: '700',
     },
     skipButton: {
-      marginTop: 14,
-      paddingVertical: 4,
+      marginTop: 8,
+      minHeight: 44,
+      paddingHorizontal: 20,
+      justifyContent: 'center',
     },
     skipText: {
-      fontSize: 13,
+      fontSize: 14,
       fontWeight: '600',
-      color: colors.faint,
+      color: colors.muted,
     },
   });
 }
