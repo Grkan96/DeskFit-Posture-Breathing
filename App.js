@@ -18,6 +18,8 @@ import {
   SNOOZE_ACTION,
   DONE_ACTION,
 } from './lib/notifications';
+import { refreshStreakAlerts } from './lib/streakAlert';
+import { DEFAULT_WORK_SCHEDULE, DEFAULT_STREAK_ALERT } from './lib/schedule';
 import { initializeAds } from './lib/ads';
 import { getTodayReminderCount, incrementTodayReminderCount } from './lib/reminderLog';
 import { useThemeColors } from './lib/theme';
@@ -32,6 +34,32 @@ const SETTINGS_KEY = 'durus-hatirlatici/settings';
 const NAME_KEY = 'durus-hatirlatici/username';
 const ONBOARDING_KEY = 'durus-hatirlatici/onboarding-seen';
 const INTERVALS = [15, 30, 45, 60];
+
+function sanitizeWorkSchedule(saved) {
+  const base = DEFAULT_WORK_SCHEDULE;
+  if (!saved || typeof saved !== 'object') return base;
+  const validHour = (h, d) => (Number.isInteger(h) && h >= 0 && h < 24 ? h : d);
+  return {
+    enabled: saved.enabled === true,
+    days: Array.isArray(saved.days)
+      ? saved.days.filter((d) => Number.isInteger(d) && d >= 0 && d <= 6)
+      : base.days,
+    start: validHour(saved.start, base.start),
+    end: validHour(saved.end, base.end),
+  };
+}
+
+function sanitizeStreakAlert(saved) {
+  const base = DEFAULT_STREAK_ALERT;
+  if (!saved || typeof saved !== 'object') return base;
+  return {
+    enabled: saved.enabled !== false,
+    minutes:
+      Number.isInteger(saved.minutes) && saved.minutes >= 0 && saved.minutes < 1440
+        ? saved.minutes
+        : base.minutes,
+  };
+}
 
 export default function App() {
   const colors = useThemeColors();
@@ -49,6 +77,8 @@ export default function App() {
   const [quietStart, setQuietStart] = useState(23);
   const [quietEnd, setQuietEnd] = useState(8);
   const [eyeRestEnabled, setEyeRestEnabled] = useState(false);
+  const [workSchedule, setWorkSchedule] = useState(DEFAULT_WORK_SCHEDULE);
+  const [streakAlert, setStreakAlert] = useState(DEFAULT_STREAK_ALERT);
   const [todayReminderCount, setTodayReminderCount] = useState(0);
 
   useEffect(() => {
@@ -64,6 +94,8 @@ export default function App() {
         quietStart,
         quietEnd,
         eyeRestEnabled,
+        workSchedule,
+        streakAlert,
       };
       let name = '';
       try {
@@ -102,6 +134,8 @@ export default function App() {
             settings.quietEnd = saved.quietEnd;
           }
           settings.eyeRestEnabled = saved.eyeRestEnabled === true;
+          settings.workSchedule = sanitizeWorkSchedule(saved.workSchedule);
+          settings.streakAlert = sanitizeStreakAlert(saved.streakAlert);
         }
 
         setUserName(name);
@@ -112,6 +146,8 @@ export default function App() {
         setQuietStart(settings.quietStart);
         setQuietEnd(settings.quietEnd);
         setEyeRestEnabled(settings.eyeRestEnabled);
+        setWorkSchedule(settings.workSchedule);
+        setStreakAlert(settings.streakAlert);
         setTodayReminderCount(await getTodayReminderCount());
 
         // Gerçek durumu işletim sisteminden oku: duruş hatırlatıcısı zaten
@@ -130,9 +166,11 @@ export default function App() {
             quietHoursEnabled: settings.quietHoursEnabled,
             quietStart: settings.quietStart,
             quietEnd: settings.quietEnd,
+            workSchedule: settings.workSchedule,
             userName: name,
           });
         }
+        await refreshStreakAlerts({ streakAlert: settings.streakAlert });
       } catch (e) {
         // Kayıtlı ayar okunamazsa varsayılanlarla devam et
       }
@@ -188,6 +226,8 @@ export default function App() {
         quietStart,
         quietEnd,
         eyeRestEnabled,
+        workSchedule,
+        streakAlert,
       })
     ).catch(() => {});
   }, [
@@ -199,6 +239,8 @@ export default function App() {
     quietStart,
     quietEnd,
     eyeRestEnabled,
+    workSchedule,
+    streakAlert,
   ]);
 
   async function requestPermission() {
@@ -216,6 +258,7 @@ export default function App() {
       quietHoursEnabled,
       quietStart,
       quietEnd,
+      workSchedule,
       userName,
       ...overrides,
     };
@@ -227,6 +270,7 @@ export default function App() {
       quietHoursEnabled,
       quietStart,
       quietEnd,
+      workSchedule,
       userName,
       ...overrides,
     });
@@ -309,6 +353,25 @@ export default function App() {
   async function handleEyeRestToggle(value) {
     setEyeRestEnabled(value);
     await refreshEyeRest({ enabled: value });
+  }
+
+  async function handleWorkScheduleChange(next) {
+    setWorkSchedule(next);
+    if (isRunning) {
+      await scheduleReminder(currentSettings({ workSchedule: next }));
+    }
+    if (eyeRestEnabled) {
+      await refreshEyeRest({ workSchedule: next });
+    }
+  }
+
+  async function handleStreakAlertChange(next) {
+    setStreakAlert(next);
+    if (next.enabled) {
+      const ok = await requestPermission();
+      if (!ok) return;
+    }
+    await refreshStreakAlerts({ streakAlert: next });
   }
 
   async function handleOnboardingFinish() {
@@ -394,6 +457,10 @@ export default function App() {
                 onQuietEndChange={handleQuietEndChange}
                 eyeRestEnabled={eyeRestEnabled}
                 onEyeRestToggle={handleEyeRestToggle}
+                workSchedule={workSchedule}
+                onWorkScheduleChange={handleWorkScheduleChange}
+                streakAlert={streakAlert}
+                onStreakAlertChange={handleStreakAlertChange}
                 onTestNotification={handleTestNotification}
               />
             )}

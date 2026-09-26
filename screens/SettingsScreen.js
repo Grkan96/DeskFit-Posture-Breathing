@@ -32,6 +32,16 @@ function formatHour(hour) {
   return `${String(hour).padStart(2, '0')}:00`;
 }
 
+// Date#getDay() değerleri, Pazartesi ile başlayan görüntü sırasına göre.
+const WEEK_ORDER = [1, 2, 3, 4, 5, 6, 0];
+const WEEKDAYS_ONLY = [1, 2, 3, 4, 5];
+
+function formatMinutes(minutes) {
+  const h = String(Math.floor(minutes / 60)).padStart(2, '0');
+  const m = String(minutes % 60).padStart(2, '0');
+  return `${h}:${m}`;
+}
+
 function SegmentedControl({ styles, options, value, onChange, t }) {
   return (
     <View style={styles.segmentRow}>
@@ -85,6 +95,31 @@ function HourStepper({ styles, label, hour, onChange }) {
   );
 }
 
+function TimeStepper({ styles, label, minutes, onChange }) {
+  return (
+    <View style={styles.stepperRow}>
+      <Text style={styles.stepperLabel}>{label}</Text>
+      <View style={styles.stepperControl}>
+        <Pressable
+          onPress={() => onChange((minutes + 1440 - 30) % 1440)}
+          style={styles.stepperButton}
+          hitSlop={8}
+        >
+          <Text style={styles.stepperButtonText}>–</Text>
+        </Pressable>
+        <Text style={styles.stepperValue}>{formatMinutes(minutes)}</Text>
+        <Pressable
+          onPress={() => onChange((minutes + 30) % 1440)}
+          style={styles.stepperButton}
+          hitSlop={8}
+        >
+          <Text style={styles.stepperButtonText}>+</Text>
+        </Pressable>
+      </View>
+    </View>
+  );
+}
+
 export default function SettingsScreen({
   userName,
   onNameChange,
@@ -101,12 +136,25 @@ export default function SettingsScreen({
   eyeRestEnabled,
   onEyeRestToggle,
   onTestNotification,
+  workSchedule,
+  onWorkScheduleChange,
+  streakAlert,
+  onStreakAlertChange,
 }) {
   const colors = useThemeColors();
   const styles = createStyles(colors);
   const { t, locale, setLocale } = useTranslation();
   const [themePreference, setThemePreference] = useThemePreference();
   const [nameText, setNameText] = useState(userName);
+
+  const weekdays = t('settings.weekdaysShort');
+
+  function toggleWorkDay(day) {
+    const days = workSchedule.days.includes(day)
+      ? workSchedule.days.filter((d) => d !== day)
+      : [...workSchedule.days, day];
+    onWorkScheduleChange({ ...workSchedule, days });
+  }
 
   function commitName() {
     const trimmed = nameText.trim();
@@ -205,6 +253,87 @@ export default function SettingsScreen({
               label={t('settings.quietEndLabel')}
               hour={quietEnd}
               onChange={onQuietEndChange}
+            />
+          </View>
+        )}
+      </View>
+
+      <View style={styles.card}>
+        <View style={styles.cardRow}>
+          <View style={styles.settingTextBlock}>
+            <Text style={styles.settingLabel}>{t('settings.workScheduleLabel')}</Text>
+            <Text style={styles.settingHint}>{t('settings.workScheduleHint')}</Text>
+          </View>
+          <Switch
+            value={workSchedule.enabled}
+            onValueChange={(enabled) => onWorkScheduleChange({ ...workSchedule, enabled })}
+            trackColor={{ false: colors.borderStrong, true: colors.accentSoft }}
+            thumbColor={workSchedule.enabled ? colors.accent : colors.inputBg}
+          />
+        </View>
+        {workSchedule.enabled && (
+          <View style={styles.steppersBlock}>
+            <View style={styles.dayRow}>
+              {WEEK_ORDER.map((day, i) => {
+                const selected = workSchedule.days.includes(day);
+                return (
+                  <Pressable
+                    key={day}
+                    onPress={() => toggleWorkDay(day)}
+                    accessibilityRole="button"
+                    accessibilityState={{ selected }}
+                    accessibilityLabel={weekdays[i]}
+                    style={[styles.dayChip, selected && styles.segmentSelected]}
+                  >
+                    <Text style={[styles.segmentText, selected && styles.segmentTextSelected]}>
+                      {weekdays[i]}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+            <Pressable
+              onPress={() => onWorkScheduleChange({ ...workSchedule, days: WEEKDAYS_ONLY })}
+              style={styles.quickButton}
+            >
+              <Text style={styles.quickButtonText}>{t('settings.workWeekdaysOnly')}</Text>
+            </Pressable>
+            <HourStepper
+              styles={styles}
+              label={t('settings.workStartLabel')}
+              hour={workSchedule.start}
+              onChange={(start) => onWorkScheduleChange({ ...workSchedule, start })}
+            />
+            <HourStepper
+              styles={styles}
+              label={t('settings.workEndLabel')}
+              hour={workSchedule.end}
+              onChange={(end) => onWorkScheduleChange({ ...workSchedule, end })}
+            />
+          </View>
+        )}
+      </View>
+
+      <View style={styles.card}>
+        <View style={styles.cardRow}>
+          <View style={styles.settingTextBlock}>
+            <Text style={styles.settingLabel}>{t('settings.streakAlertLabel')}</Text>
+            <Text style={styles.settingHint}>{t('settings.streakAlertHint')}</Text>
+          </View>
+          <Switch
+            value={streakAlert.enabled}
+            onValueChange={(enabled) => onStreakAlertChange({ ...streakAlert, enabled })}
+            trackColor={{ false: colors.borderStrong, true: colors.accentSoft }}
+            thumbColor={streakAlert.enabled ? colors.accent : colors.inputBg}
+          />
+        </View>
+        {streakAlert.enabled && (
+          <View style={styles.steppersBlock}>
+            <TimeStepper
+              styles={styles}
+              label={t('settings.streakAlertTimeLabel')}
+              minutes={streakAlert.minutes}
+              onChange={(minutes) => onStreakAlertChange({ ...streakAlert, minutes })}
             />
           </View>
         )}
@@ -338,6 +467,29 @@ function createStyles(colors) {
     steppersBlock: {
       marginTop: 12,
       gap: 10,
+    },
+    dayRow: {
+      flexDirection: 'row',
+      gap: 4,
+    },
+    dayChip: {
+      flex: 1,
+      paddingVertical: 8,
+      borderRadius: 8,
+      backgroundColor: colors.inputBg,
+      alignItems: 'center',
+    },
+    quickButton: {
+      alignSelf: 'flex-start',
+      paddingVertical: 6,
+      paddingHorizontal: 12,
+      borderRadius: 8,
+      backgroundColor: colors.accentSofter,
+    },
+    quickButtonText: {
+      fontSize: 12,
+      fontWeight: '700',
+      color: colors.accentText,
     },
     stepperRow: {
       flexDirection: 'row',
