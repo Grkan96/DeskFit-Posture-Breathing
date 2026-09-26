@@ -12,11 +12,11 @@ function initialSession(steps) {
 // Sırayla ilerleyen, her adımı bir süre boyunca gösteren genel amaçlı seans
 // bileşeni. Nefes dersleri hariç (o özel bir faz/tur döngüsü kullanıyor),
 // hareketler ve egzersizler bunu paylaşır.
-export default function StepSession({ title, subtitle, steps, onBack, idleIcon = '🧘', type }) {
+export default function StepSession({ title, subtitle, steps, onBack, idleIcon = '🧘', type, autoStart = false }) {
   const colors = useThemeColors();
   const styles = createStyles(colors);
   const { t } = useTranslation();
-  const [running, setRunning] = useState(false);
+  const [running, setRunning] = useState(autoStart);
   const [finished, setFinished] = useState(false);
   const [session, setSession] = useState(() => initialSession(steps));
 

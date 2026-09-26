@@ -1,17 +1,10 @@
 import StepSession from '../components/StepSession';
+import { EXERCISE_META } from '../lib/sessionContent';
 import { useTranslation } from '../lib/i18n';
 
-// Görsel metinler (title/instruction) burada değil, lib/locales/{tr,en}.js
-// içindeki exercises.items.<id> anahtarlarında tutulur.
-const EXERCISE_META = [
-  { id: 'wall-pushup', icon: '🧱', seconds: 25 },
-  { id: 'chair-squat', icon: '🪑', seconds: 25 },
-  { id: 'plank-hold', icon: '🏋️', seconds: 20 },
-  { id: 'calf-raise', icon: '🦵', seconds: 20 },
-  { id: 'seated-core', icon: '🔥', seconds: 20 },
-];
-
-export default function ExercisesScreen({ onBack }) {
+// Görsel metinler (title/instruction) lib/locales/{tr,en}.js içindeki
+// exercises.items.<id> anahtarlarında, meta veri lib/sessionContent.js'de tutulur.
+export default function ExercisesScreen({ onBack, autoStart = false }) {
   const { t } = useTranslation();
   const steps = EXERCISE_META.map((e) => ({
     ...e,
@@ -27,6 +20,7 @@ export default function ExercisesScreen({ onBack }) {
       onBack={onBack}
       idleIcon="💪"
       type="exercises"
+      autoStart={autoStart}
     />
   );
 }
