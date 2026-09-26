@@ -6,6 +6,7 @@ import { useTranslation } from '../lib/i18n';
 const TABS = [
   { key: 'home', labelKey: 'tabBar.home', icon: '🏠' },
   { key: 'meditation', labelKey: 'tabBar.meditation', icon: '🧘' },
+  { key: 'stats', labelKey: 'tabBar.stats', icon: '📊' },
   { key: 'settings', labelKey: 'tabBar.settings', icon: '⚙️' },
 ];
 
@@ -59,7 +60,7 @@ function createStyles(colors) {
       gap: 2,
     },
     pill: {
-      paddingHorizontal: 18,
+      paddingHorizontal: 14,
       paddingVertical: 4,
       borderRadius: 999,
     },

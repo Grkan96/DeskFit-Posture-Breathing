@@ -29,6 +29,7 @@ import HomeScreen from './screens/HomeScreen';
 import MeditationScreen from './screens/MeditationScreen';
 import SettingsScreen from './screens/SettingsScreen';
 import TabBar from './components/TabBar';
+import StatsScreen from './screens/StatsScreen';
 
 const SETTINGS_KEY = 'durus-hatirlatici/settings';
 const NAME_KEY = 'durus-hatirlatici/username';
@@ -445,7 +446,8 @@ export default function App() {
                 onIntervalCommit={handleIntervalCommit}
               />
             )}
-            {activeTab === 'meditation' && <MeditationScreen />}
+            {activeTab === 'meditation' && <MeditationScreen onChangeTab={setActiveTab} />}
+            {activeTab === 'stats' && <StatsScreen />}
             {activeTab === 'settings' && (
               <SettingsScreen
                 userName={userName}

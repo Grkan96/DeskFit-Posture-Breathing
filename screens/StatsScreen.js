@@ -15,7 +15,32 @@ const TYPE_META = [
   { key: 'exercises', icon: '💪', labelKey: 'stats.typeExercises' },
 ];
 
-export default function StatsScreen({ onBack }) {
+// Kilitli rozet için kalan miktar ipucu (yalnızca görüntü; achievements.js'e dokunmaz).
+function lockedHint(id, stats, t) {
+  const today = stats.history[todayKey()] || 0;
+  const sessions = (left) =>
+    left === 1 ? t('stats.sessionOneLeft') : t('stats.sessionsLeft', { count: left });
+  let left = 0;
+  switch (id) {
+    case 'first_session': left = 1 - stats.totalSessions; break;
+    case 'sessions_20': left = 20 - stats.totalSessions; break;
+    case 'sessions_50': left = 50 - stats.totalSessions; break;
+    case 'breathing_10': left = 10 - (stats.byType.breathing || 0); break;
+    case 'triple_day': left = 3 - today; break;
+    case 'streak_7': left = 7 - stats.streak; break;
+    case 'streak_30': left = 30 - stats.streak; break;
+    case 'streak_100': left = 100 - stats.streak; break;
+    case 'all_types': {
+      const n = ['breathing', 'movements', 'exercises'].filter((k) => !(stats.byType[k] > 0)).length;
+      return n > 0 ? t('stats.typesLeft', { count: n }) : null;
+    }
+    default: return null;
+  }
+  if (left <= 0) return null;
+  return id.startsWith('streak_') ? t('stats.daysLeft', { count: left }) : sessions(left);
+}
+
+export default function StatsScreen() {
   const colors = useThemeColors();
   const styles = createStyles(colors);
   const { t } = useTranslation();
@@ -44,11 +69,15 @@ export default function StatsScreen({ onBack }) {
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      <Pressable onPress={onBack} style={styles.backButton} hitSlop={10}>
-        <Text style={styles.backText}>{t('stats.backToMeditation')}</Text>
-      </Pressable>
+      <Text style={styles.header} accessibilityRole="header">{t('stats.header')}</Text>
 
-      <Text style={styles.header}>{t('stats.header')}</Text>
+      {stats.totalSessions === 0 && (
+        <View style={styles.emptyCard} accessible accessibilityLabel={`${t('stats.emptyTitle')}. ${t('stats.emptyBody')}`}>
+          <Text style={styles.emptyEmoji}>🌱</Text>
+          <Text style={styles.emptyTitle}>{t('stats.emptyTitle')}</Text>
+          <Text style={styles.emptyBody}>{t('stats.emptyBody')}</Text>
+        </View>
+      )}
 
       <View style={styles.summaryRow}>
         <View style={styles.summaryCard}>
@@ -142,10 +171,14 @@ export default function StatsScreen({ onBack }) {
         {ACHIEVEMENTS.map((a) => {
           const unlocked = !!stats.achievements[a.id];
           const title = t(`achievements.items.${a.id}.title`);
+          const description = t(`achievements.items.${a.id}.description`);
+          const hint = unlocked ? null : lockedHint(a.id, stats, t);
           return (
             <Pressable
               key={a.id}
               disabled={!unlocked}
+              accessibilityRole={unlocked ? 'button' : 'text'}
+              accessibilityLabel={`${title}. ${description}. ${unlocked ? t('achievements.shareBadge') : `${t('achievements.locked')}${hint ? `, ${hint}` : ''}`}`}
               onPress={() => shareBadge({ icon: a.icon, name: title })}
               style={[styles.badgeCard, !unlocked && styles.badgeCardLocked]}
             >
@@ -154,8 +187,9 @@ export default function StatsScreen({ onBack }) {
               </Text>
               <Text style={styles.badgeTitle} numberOfLines={1}>{title}</Text>
               <Text style={styles.badgeDesc} numberOfLines={2}>
-                {t(`achievements.items.${a.id}.description`)}
+                {description}
               </Text>
+              {hint && <Text style={styles.badgeHint}>{hint}</Text>}
             </Pressable>
           );
         })}
@@ -180,18 +214,20 @@ function createStyles(colors) {
     },
     content: {
       paddingHorizontal: 24,
-      paddingTop: 16,
+      paddingTop: 24,
       paddingBottom: 32,
     },
-    backButton: {
-      alignSelf: 'flex-start',
-      marginBottom: 8,
+    emptyCard: {
+      backgroundColor: colors.accentSofter,
+      borderRadius: 16,
+      padding: 20,
+      alignItems: 'center',
+      marginBottom: 24,
     },
-    backText: {
-      fontSize: 14,
-      fontWeight: '600',
-      color: colors.accent,
-    },
+    emptyEmoji: { fontSize: 40, marginBottom: 6 },
+    emptyTitle: { fontSize: 16, fontWeight: '800', color: colors.accentText, textAlign: 'center' },
+    emptyBody: { marginTop: 4, fontSize: 13, color: colors.text, textAlign: 'center', lineHeight: 19 },
+    badgeHint: { marginTop: 6, fontSize: 11, fontWeight: '700', color: colors.accentText, textAlign: 'center' },
     header: {
       fontSize: 20,
       fontWeight: '700',

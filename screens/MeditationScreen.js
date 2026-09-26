@@ -3,7 +3,6 @@ import { Alert, ScrollView, StyleSheet, Text, View, Pressable } from 'react-nati
 import BreathingScreen from './BreathingScreen';
 import MovementsScreen from './MovementsScreen';
 import ExercisesScreen from './ExercisesScreen';
-import StatsScreen from './StatsScreen';
 import AdBanner from '../components/AdBanner';
 import BreathingSession from '../components/BreathingSession';
 import QuickBreak from '../components/QuickBreak';
@@ -38,7 +37,7 @@ function CategoryCard({ styles, icon, title, description, ready, badgeLabel, onP
   );
 }
 
-export default function MeditationScreen() {
+export default function MeditationScreen({ onChangeTab }) {
   const colors = useThemeColors();
   const styles = createStyles(colors);
   const { t } = useTranslation();
@@ -88,9 +87,6 @@ export default function MeditationScreen() {
   if (activeSession === 'exercises') {
     return <ExercisesScreen onBack={back} />;
   }
-  if (activeSession === 'stats') {
-    return <StatsScreen onBack={() => setActiveSession(null)} />;
-  }
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
@@ -101,7 +97,9 @@ export default function MeditationScreen() {
       {stats && stats.totalSessions > 0 && (
         <Pressable
           style={({ pressed }) => [styles.statsRow, pressed && styles.cardPressed]}
-          onPress={() => setActiveSession('stats')}
+          onPress={() => onChangeTab && onChangeTab('stats')}
+          accessibilityRole="button"
+          accessibilityLabel={`${t('meditation.statsStreak')} ${stats.streak}, ${t('meditation.statsSessions')} ${stats.totalSessions}. ${t('stats.seeStats')}`}
         >
           <View style={styles.statBadge}>
             <Text style={styles.statValue}>🔥 {stats.streak}</Text>
@@ -118,7 +116,7 @@ export default function MeditationScreen() {
         <View style={styles.challengeCard}>
           <Text style={styles.challengeTitle}>{t('challenge.sectionLabel')}</Text>
           {challenge.active || challenge.completed ? (
-            <Pressable onPress={() => setActiveSession('stats')} hitSlop={6}>
+            <Pressable onPress={() => onChangeTab && onChangeTab('stats')} hitSlop={6} accessibilityRole="button">
               <Text style={styles.challengeBody}>
                 {challenge.completed
                   ? t('challenge.completedLabel')
