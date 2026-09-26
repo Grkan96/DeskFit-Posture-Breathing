@@ -3,6 +3,7 @@ import { Alert, ScrollView, StyleSheet, Text, View, Pressable } from 'react-nati
 import BreathingScreen from './BreathingScreen';
 import MovementsScreen from './MovementsScreen';
 import ExercisesScreen from './ExercisesScreen';
+import EyeExercisesScreen from './EyeExercisesScreen';
 import StatsScreen from './StatsScreen';
 import AdBanner from '../components/AdBanner';
 import { getStats } from '../lib/stats';
@@ -13,6 +14,7 @@ const CATEGORIES = [
   { id: 'movements', icon: '🧘', ready: true },
   { id: 'exercises', icon: '💪', ready: true },
   { id: 'breathing', icon: '🌬️', ready: true },
+  { id: 'eyes', icon: '👀', ready: true },
 ];
 
 function CategoryCard({ styles, icon, title, description, ready, badgeLabel, onPress }) {
@@ -54,6 +56,9 @@ export default function MeditationScreen() {
   }
   if (activeSession === 'exercises') {
     return <ExercisesScreen onBack={() => setActiveSession(null)} />;
+  }
+  if (activeSession === 'eyes') {
+    return <EyeExercisesScreen onBack={() => setActiveSession(null)} />;
   }
   if (activeSession === 'stats') {
     return <StatsScreen onBack={() => setActiveSession(null)} />;
