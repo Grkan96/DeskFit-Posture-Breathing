@@ -132,11 +132,13 @@ function createStyles(colors) {
     card: {
       alignSelf: 'stretch',
       backgroundColor: colors.surface,
-      borderRadius: 16,
+      borderRadius: 20,
       paddingVertical: 18,
       paddingHorizontal: 16,
+      borderWidth: 1,
+      borderColor: colors.border,
       elevation: 2,
-      shadowColor: '#000',
+      shadowColor: colors.shadow,
       shadowOpacity: 0.06,
       shadowRadius: 6,
       shadowOffset: { width: 0, height: 2 },
@@ -153,7 +155,7 @@ function createStyles(colors) {
     valueUnit: {
       fontSize: 13,
       fontWeight: '600',
-      color: colors.faint,
+      color: colors.muted,
       marginTop: -2,
     },
     rulerWrap: {
@@ -174,7 +176,7 @@ function createStyles(colors) {
       width: 2,
       height: 12,
       borderRadius: 1,
-      backgroundColor: colors.border,
+      backgroundColor: colors.borderStrong,
     },
     tickMajor: {
       width: 2.5,
@@ -185,7 +187,7 @@ function createStyles(colors) {
       marginTop: 4,
       fontSize: 11,
       fontWeight: '700',
-      color: colors.faint,
+      color: colors.muted,
       height: LABEL_ZONE - 4,
     },
     indicatorArrow: {
