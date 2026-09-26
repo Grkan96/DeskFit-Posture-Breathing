@@ -33,7 +33,6 @@ import TabBar from './components/TabBar';
 const SETTINGS_KEY = 'durus-hatirlatici/settings';
 const NAME_KEY = 'durus-hatirlatici/username';
 const ONBOARDING_KEY = 'durus-hatirlatici/onboarding-seen';
-const INTERVALS = [15, 30, 45, 60];
 
 function sanitizeWorkSchedule(saved) {
   const base = DEFAULT_WORK_SCHEDULE;
@@ -111,10 +110,16 @@ export default function App() {
         const seenOnboarding = await AsyncStorage.getItem(ONBOARDING_KEY);
         setOnboardingSeen(seenOnboarding === 'true');
 
-        const raw = await AsyncStorage.getItem(SETTINGS_KEY);
-        if (raw) {
-          const saved = JSON.parse(raw);
-          if (INTERVALS.includes(saved.intervalMinutes) || Number.isInteger(saved.intervalMinutes)) {
+        // Bozuk ayar verisi kullanıcı adını/kuyruk yenilemeyi engellemesin diye
+        // ayrı try/catch (yoksa isim state'e hiç yazılmaz, NameScreen tekrar çıkar).
+        let saved = null;
+        try {
+          const raw = await AsyncStorage.getItem(SETTINGS_KEY);
+          const p = raw ? JSON.parse(raw) : null;
+          if (p && typeof p === 'object' && !Array.isArray(p)) saved = p;
+        } catch (e) {}
+        if (saved) {
+          if (Number.isInteger(saved.intervalMinutes) && saved.intervalMinutes >= 1 && saved.intervalMinutes <= 1440) {
             settings.intervalMinutes = saved.intervalMinutes;
           }
           if (['silent', 'vibrate', 'sound'].includes(saved.alertMode)) {
