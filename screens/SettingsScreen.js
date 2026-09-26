@@ -4,6 +4,7 @@ import AdBanner from '../components/AdBanner';
 import { useThemeColors, useThemePreference } from '../lib/theme';
 import { useTranslation } from '../lib/i18n';
 import { shareApp } from '../lib/sharing';
+import ShareCard from '../components/ShareCard';
 
 const THEME_MODES = [
   { key: 'system', labelKey: 'settings.themeSystem', icon: '🌓' },
@@ -369,6 +370,8 @@ export default function SettingsScreen({
       <Pressable onPress={shareApp} style={styles.shareButton}>
         <Text style={styles.shareButtonText}>{t('settings.shareButton')}</Text>
       </Pressable>
+
+      <ShareCard />
 
       <Pressable
         onPress={() => Alert.alert(t('settings.privacyTitle'), t('settings.privacyText'))}
