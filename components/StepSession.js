@@ -1,9 +1,11 @@
-import { useEffect, useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { useEffect, useRef, useState } from 'react';
+import { Animated, Pressable, StyleSheet, Text, View } from 'react-native';
 import { recordSessionCompleted } from '../lib/stats';
 import { celebrateIfMilestone } from '../lib/celebrateMilestone';
 import { useThemeColors } from '../lib/theme';
 import { useTranslation } from '../lib/i18n';
+import Confetti from './Confetti';
+import { CountdownRing, StepDots, StepProgressBar, successHaptic, tapHaptic, useReduceMotion } from './SessionProgress';
 
 function initialSession(steps) {
   return { stepIndex: 0, secondsLeft: steps[0].seconds, done: false };
@@ -19,6 +21,8 @@ export default function StepSession({ title, subtitle, steps, onBack, idleIcon =
   const [running, setRunning] = useState(autoStart);
   const [finished, setFinished] = useState(false);
   const [session, setSession] = useState(() => initialSession(steps));
+  const reduceMotion = useReduceMotion();
+  const cardAnim = useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
     if (!running) return;
@@ -41,9 +45,19 @@ export default function StepSession({ title, subtitle, steps, onBack, idleIcon =
     if (session.done) {
       setRunning(false);
       setFinished(true);
+      successHaptic();
       recordSessionCompleted(type).then(celebrateIfMilestone);
     }
   }, [session.done]);
+
+  // Adım değişince kart yumuşakça belirip yerine kayar; hafif haptic.
+  useEffect(() => {
+    if (!running) return;
+    tapHaptic();
+    if (reduceMotion) return;
+    cardAnim.setValue(0);
+    Animated.timing(cardAnim, { toValue: 1, duration: 320, useNativeDriver: true }).start();
+  }, [session.stepIndex, running, reduceMotion]);
 
   function handleStart() {
     setFinished(false);
@@ -68,14 +82,27 @@ export default function StepSession({ title, subtitle, steps, onBack, idleIcon =
 
   const step = steps[session.stepIndex];
   const totalSeconds = steps.reduce((sum, s) => sum + s.seconds, 0);
+  const stepLabel = t('stepSession.stepOf', { current: session.stepIndex + 1, total: steps.length });
+  const cardMotion = reduceMotion
+    ? null
+    : {
+        opacity: cardAnim,
+        transform: [{ translateY: cardAnim.interpolate({ inputRange: [0, 1], outputRange: [16, 0] }) }],
+      };
 
   return (
     <View style={styles.container}>
-      <Pressable onPress={onBack} style={styles.backButton} hitSlop={10}>
+      <Pressable
+        onPress={onBack}
+        style={styles.backButton}
+        hitSlop={8}
+        accessibilityRole="button"
+        accessibilityLabel={t('stepSession.backToMeditation')}
+      >
         <Text style={styles.backText}>{t('stepSession.backToMeditation')}</Text>
       </Pressable>
 
-      <Text style={styles.title}>{title}</Text>
+      <Text style={styles.title} accessibilityRole="header">{title}</Text>
       <Text style={styles.subtitle}>
         {subtitle}{' '}
         {t('stepSession.approxMinutes', { minutes: Math.round(totalSeconds / 60) || 1 })}
@@ -84,32 +111,67 @@ export default function StepSession({ title, subtitle, steps, onBack, idleIcon =
       <View style={styles.body}>
         {running ? (
           <>
-            <View style={styles.dots}>
-              {steps.map((s, i) => (
-                <View
-                  key={s.id}
-                  style={[
-                    styles.dot,
-                    i === session.stepIndex && styles.dotActive,
-                    i < session.stepIndex && styles.dotDone,
-                  ]}
-                />
-              ))}
+            <View style={styles.progressWrap}>
+              <StepProgressBar
+                total={steps.length}
+                current={session.stepIndex}
+                color={colors.accent}
+                trackColor={colors.border}
+                reduceMotion={reduceMotion}
+                label={stepLabel}
+              />
+              <StepDots
+                total={steps.length}
+                current={session.stepIndex}
+                activeColor={colors.accent}
+                doneColor={colors.accentSoft}
+                trackColor={colors.border}
+              />
+              <Text style={styles.stepText}>{stepLabel}</Text>
             </View>
 
-            <View style={styles.card}>
+            <Animated.View
+              style={[styles.card, cardMotion]}
+              accessible
+              accessibilityLabel={`${stepLabel}. ${step.title}. ${step.instruction}. ${t('stepSession.secondsLeft', { count: session.secondsLeft })}`}
+            >
               <Text style={styles.cardIcon}>{step.icon}</Text>
               <Text style={styles.cardTitle}>{step.title}</Text>
               <Text style={styles.cardInstruction}>{step.instruction}</Text>
-              <Text style={styles.cardCount}>{session.secondsLeft}</Text>
-            </View>
+              <View style={styles.ringWrap}>
+                <CountdownRing
+                  size={112}
+                  thickness={6}
+                  segments={40}
+                  progress={session.secondsLeft / step.seconds}
+                  color={colors.accent}
+                  trackColor={colors.border}
+                >
+                  <Text style={styles.cardCount}>{session.secondsLeft}</Text>
+                </CountdownRing>
+              </View>
+            </Animated.View>
 
-            <Pressable onPress={handleSkip} style={styles.skipButton} hitSlop={8}>
+            <Pressable
+              onPress={handleSkip}
+              style={styles.skipButton}
+              hitSlop={8}
+              accessibilityRole="button"
+              accessibilityLabel={t('stepSession.nextButton')}
+            >
               <Text style={styles.skipText}>{t('stepSession.nextButton')}</Text>
             </Pressable>
           </>
         ) : (
-          <View style={styles.card}>
+          <View
+            style={styles.card}
+            accessible
+            accessibilityLabel={
+              finished
+                ? `${t('stepSession.doneTitle')}. ${t('stepSession.doneBody')}`
+                : `${t('stepSession.readyTitle')}. ${t('stepSession.readyBody')}`
+            }
+          >
             <Text style={styles.cardIcon}>{finished ? '🎉' : idleIcon}</Text>
             <Text style={styles.cardTitle}>
               {finished ? t('stepSession.doneTitle') : t('stepSession.readyTitle')}
@@ -119,16 +181,21 @@ export default function StepSession({ title, subtitle, steps, onBack, idleIcon =
             </Text>
           </View>
         )}
+        <Confetti active={finished && !running} />
       </View>
 
       <Pressable
         onPress={running ? handleStop : handleStart}
+        accessibilityRole="button"
+        accessibilityLabel={
+          running ? t('stepSession.stop') : finished ? t('stepSession.restart') : t('stepSession.start')
+        }
         style={[
           styles.actionButton,
           running ? styles.actionButtonStop : styles.actionButtonStart,
         ]}
       >
-        <Text style={styles.actionButtonText}>
+        <Text style={running ? styles.actionButtonTextStop : styles.actionButtonText}>
           {running
             ? t('stepSession.stop')
             : finished
@@ -150,7 +217,8 @@ function createStyles(colors) {
     },
     backButton: {
       alignSelf: 'flex-start',
-      marginBottom: 8,
+      minHeight: 48,
+      justifyContent: 'center',
     },
     backText: {
       fontSize: 14,
@@ -176,33 +244,29 @@ function createStyles(colors) {
       alignItems: 'center',
       justifyContent: 'center',
     },
-    dots: {
-      flexDirection: 'row',
-      gap: 8,
+    progressWrap: {
+      alignSelf: 'stretch',
+      alignItems: 'center',
       marginBottom: 20,
     },
-    dot: {
-      width: 8,
-      height: 8,
-      borderRadius: 4,
-      backgroundColor: colors.border,
+    stepText: {
+      marginTop: 8,
+      fontSize: 12,
+      fontWeight: '600',
+      color: colors.muted,
     },
-    dotActive: {
-      backgroundColor: colors.accent,
-      width: 20,
-    },
-    dotDone: {
-      backgroundColor: colors.accentSoft,
+    ringWrap: {
+      marginTop: 16,
     },
     card: {
       alignSelf: 'stretch',
       backgroundColor: colors.surface,
       borderRadius: 20,
       paddingHorizontal: 24,
-      paddingVertical: 32,
+      paddingVertical: 28,
       alignItems: 'center',
       elevation: 3,
-      shadowColor: '#000',
+      shadowColor: colors.shadow,
       shadowOpacity: 0.08,
       shadowRadius: 8,
       shadowOffset: { width: 0, height: 3 },
@@ -225,15 +289,17 @@ function createStyles(colors) {
       lineHeight: 19,
     },
     cardCount: {
-      marginTop: 18,
       fontSize: 36,
       fontWeight: '800',
       color: colors.accent,
     },
     skipButton: {
-      marginTop: 18,
-      paddingVertical: 8,
-      paddingHorizontal: 14,
+      marginTop: 12,
+      minHeight: 48,
+      minWidth: 48,
+      justifyContent: 'center',
+      alignItems: 'center',
+      paddingHorizontal: 20,
     },
     skipText: {
       fontSize: 13,
@@ -243,7 +309,8 @@ function createStyles(colors) {
     actionButton: {
       alignSelf: 'stretch',
       borderRadius: 14,
-      paddingVertical: 14,
+      minHeight: 52,
+      justifyContent: 'center',
       alignItems: 'center',
       marginBottom: 24,
     },
@@ -254,7 +321,12 @@ function createStyles(colors) {
       backgroundColor: colors.danger,
     },
     actionButtonText: {
-      color: '#ffffff',
+      color: colors.onAccent,
+      fontSize: 16,
+      fontWeight: '700',
+    },
+    actionButtonTextStop: {
+      color: colors.onDanger,
       fontSize: 16,
       fontWeight: '700',
     },

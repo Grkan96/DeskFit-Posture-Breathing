@@ -4,8 +4,12 @@ import { recordSessionCompleted } from '../lib/stats';
 import { celebrateIfMilestone } from '../lib/celebrateMilestone';
 import { useThemeColors } from '../lib/theme';
 import { useTranslation } from '../lib/i18n';
+import Confetti from './Confetti';
+import { CountdownRing, phaseColor, successHaptic, tapHaptic, useReduceMotion } from './SessionProgress';
 
 const REST_SCALE = 0.75;
+const CIRCLE = 170;
+const RING = 250;
 
 function initialSession(phases) {
   return { phaseIndex: 0, secondsLeft: phases[0].seconds, cycle: 1, done: false };
@@ -21,6 +25,7 @@ export default function BreathingSession({ technique, onBack, autoStart = false,
   const [running, setRunning] = useState(autoStart);
   const [finished, setFinished] = useState(false);
   const [session, setSession] = useState(() => initialSession(phases));
+  const reduceMotion = useReduceMotion();
   const scaleAnim = useRef(new Animated.Value(REST_SCALE)).current;
 
   // Her saniye tik atar; faz süresi dolunca bir sonraki faza (veya tura) geçer.
@@ -52,6 +57,7 @@ export default function BreathingSession({ technique, onBack, autoStart = false,
     if (session.done) {
       setRunning(false);
       setFinished(true);
+      successHaptic();
       // onComplete verilmişse (hızlı mola akışı) kayıt akışın sonunda yapılır.
       if (onComplete) onComplete();
       else recordSessionCompleted('breathing').then(celebrateIfMilestone);
@@ -62,12 +68,17 @@ export default function BreathingSession({ technique, onBack, autoStart = false,
   useEffect(() => {
     if (!running) return;
     const phase = phases[session.phaseIndex];
+    tapHaptic();
+    if (reduceMotion) {
+      scaleAnim.setValue(phase.scale);
+      return;
+    }
     Animated.timing(scaleAnim, {
       toValue: phase.scale,
       duration: phase.seconds * 1000,
       useNativeDriver: true,
     }).start();
-  }, [running, session.phaseIndex, phases]);
+  }, [running, session.phaseIndex, phases, reduceMotion]);
 
   function handleStart() {
     setFinished(false);
@@ -84,33 +95,72 @@ export default function BreathingSession({ technique, onBack, autoStart = false,
   }
 
   const phase = phases[session.phaseIndex];
+  const tint = running ? phaseColor(colors, phase.phaseKey) : colors.accent;
+  const glowScale = scaleAnim.interpolate({ inputRange: [0.5, 1.5], outputRange: [0.6, 1.5] });
 
   return (
     <View style={styles.container}>
-      <Pressable onPress={onBack} style={styles.backButton} hitSlop={10}>
+      <Pressable
+        onPress={onBack}
+        style={styles.backButton}
+        hitSlop={8}
+        accessibilityRole="button"
+        accessibilityLabel={backLabel || t('breathing.backToTechniques')}
+      >
         <Text style={styles.backText}>{backLabel || t('breathing.backToTechniques')}</Text>
       </Pressable>
 
-      <Text style={styles.title}>{title}</Text>
+      <Text style={styles.title} accessibilityRole="header">{title}</Text>
       <Text style={styles.subtitle}>
         {phases.map((p) => `${t(`breathing.${p.phaseKey}`)} ${p.seconds}s`).join(' · ')}
         {' — '}
         {t('breathing.cyclesCount', { count: cycles })}
       </Text>
 
-      <View style={styles.circleWrap}>
-        <Animated.View style={[styles.circle, { transform: [{ scale: scaleAnim }] }]}>
-          {running ? (
-            <>
-              <Text style={styles.phaseLabel}>{t(`breathing.${phase.phaseKey}`)}</Text>
-              <Text style={styles.phaseCount}>{session.secondsLeft}</Text>
-            </>
-          ) : (
-            <Text style={styles.circleIdleText}>
-              {finished ? t('breathing.doneTitle') : t('breathing.readyTitle')}
-            </Text>
-          )}
-        </Animated.View>
+      <View
+        style={styles.circleWrap}
+        accessible
+        accessibilityLiveRegion="polite"
+        accessibilityLabel={
+          running
+            ? `${t(`breathing.${phase.phaseKey}`)}, ${t('breathing.secondsLeft', { count: session.secondsLeft })}`
+            : finished
+              ? t('breathing.doneTitle')
+              : t('breathing.readyTitle')
+        }
+      >
+        <CountdownRing
+          size={RING}
+          progress={running ? session.secondsLeft / phase.seconds : finished ? 1 : 0}
+          color={tint}
+          trackColor={colors.border}
+        >
+          <Animated.View
+            style={[
+              styles.glow,
+              { backgroundColor: tint, transform: [{ scale: glowScale }] },
+            ]}
+          />
+          <Animated.View
+            style={[
+              styles.circle,
+              { borderColor: tint, transform: [{ scale: scaleAnim }] },
+            ]}
+          />
+          <View style={styles.center} pointerEvents="none">
+            {running ? (
+              <>
+                <Text style={[styles.phaseLabel, { color: tint }]}>{t(`breathing.${phase.phaseKey}`)}</Text>
+                <Text style={styles.phaseCount}>{session.secondsLeft}</Text>
+              </>
+            ) : (
+              <Text style={styles.circleIdleText}>
+                {finished ? t('breathing.doneTitle') : t('breathing.readyTitle')}
+              </Text>
+            )}
+          </View>
+        </CountdownRing>
+        <Confetti active={finished} />
       </View>
 
       <Text style={styles.cycleText}>
@@ -119,12 +169,14 @@ export default function BreathingSession({ technique, onBack, autoStart = false,
 
       <Pressable
         onPress={running ? handleStop : handleStart}
+        accessibilityRole="button"
+        accessibilityLabel={running ? t('breathing.stop') : finished ? t('breathing.restart') : t('breathing.start')}
         style={[
           styles.actionButton,
           running ? styles.actionButtonStop : styles.actionButtonStart,
         ]}
       >
-        <Text style={styles.actionButtonText}>
+        <Text style={running ? styles.actionButtonTextStop : styles.actionButtonText}>
           {running ? t('breathing.stop') : finished ? t('breathing.restart') : t('breathing.start')}
         </Text>
       </Pressable>
@@ -142,7 +194,8 @@ function createStyles(colors) {
     },
     backButton: {
       alignSelf: 'flex-start',
-      marginBottom: 8,
+      minHeight: 48,
+      justifyContent: 'center',
     },
     backText: {
       fontSize: 14,
@@ -169,28 +222,34 @@ function createStyles(colors) {
       justifyContent: 'center',
     },
     circle: {
-      width: 200,
-      height: 200,
-      borderRadius: 100,
+      position: 'absolute',
+      width: CIRCLE,
+      height: CIRCLE,
+      borderRadius: CIRCLE / 2,
+      borderWidth: 4,
       backgroundColor: colors.accentSofter,
+    },
+    glow: {
+      position: 'absolute',
+      width: CIRCLE,
+      height: CIRCLE,
+      borderRadius: CIRCLE / 2,
+      opacity: 0.14,
+    },
+    center: {
       alignItems: 'center',
       justifyContent: 'center',
-      elevation: 4,
-      shadowColor: '#000',
-      shadowOpacity: 0.1,
-      shadowRadius: 10,
-      shadowOffset: { width: 0, height: 4 },
+      paddingHorizontal: 30,
     },
     phaseLabel: {
       fontSize: 18,
       fontWeight: '700',
-      color: colors.accentText,
     },
     phaseCount: {
       marginTop: 4,
       fontSize: 32,
       fontWeight: '800',
-      color: colors.accentText,
+      color: colors.text,
     },
     circleIdleText: {
       fontSize: 15,
@@ -209,7 +268,8 @@ function createStyles(colors) {
     actionButton: {
       alignSelf: 'stretch',
       borderRadius: 14,
-      paddingVertical: 14,
+      minHeight: 52,
+      justifyContent: 'center',
       alignItems: 'center',
       marginBottom: 24,
     },
@@ -220,7 +280,12 @@ function createStyles(colors) {
       backgroundColor: colors.danger,
     },
     actionButtonText: {
-      color: '#ffffff',
+      color: colors.onAccent,
+      fontSize: 16,
+      fontWeight: '700',
+    },
+    actionButtonTextStop: {
+      color: colors.onDanger,
       fontSize: 16,
       fontWeight: '700',
     },
