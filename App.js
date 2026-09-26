@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { useEffect, useRef, useState } from 'react';
+import { AppState, StyleSheet, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
@@ -17,6 +17,8 @@ import {
   setEyeRestReminders,
   SNOOZE_ACTION,
   DONE_ACTION,
+  POSTURE_CATEGORY,
+  getNextPostureReminderAt,
 } from './lib/notifications';
 import { refreshStreakAlerts } from './lib/streakAlert';
 import { DEFAULT_WORK_SCHEDULE, DEFAULT_STREAK_ALERT } from './lib/schedule';
@@ -34,6 +36,12 @@ import StatsScreen from './screens/StatsScreen';
 const SETTINGS_KEY = 'durus-hatirlatici/settings';
 const NAME_KEY = 'durus-hatirlatici/username';
 const ONBOARDING_KEY = 'durus-hatirlatici/onboarding-seen';
+// Kullanıcı START'a bastıysa 'true'; STOP'ta silinir. Bildirim kuyruğu boşalsa
+// bile arayüzün 'çalışıyor' göstermesini ve kuyruğun yeniden dolmasını sağlar.
+const RUNNING_KEY = 'durus-hatirlatici/running';
+// Kuyruk yenilemeleri arası asgari süre (bildirim başına gereksiz yeniden
+// zamanlamayı önler).
+const REFILL_MIN_GAP_MS = 30 * 1000;
 
 function sanitizeWorkSchedule(saved) {
   const base = DEFAULT_WORK_SCHEDULE;
@@ -80,6 +88,67 @@ export default function App() {
   const [workSchedule, setWorkSchedule] = useState(DEFAULT_WORK_SCHEDULE);
   const [streakAlert, setStreakAlert] = useState(DEFAULT_STREAK_ALERT);
   const [todayReminderCount, setTodayReminderCount] = useState(0);
+  const [nextReminderAt, setNextReminderAt] = useState(null);
+  // Kayıtlı ayarlar gerçekten okunup uygulanmadan diske yazma yapılmaz
+  // (4 sn'lik fail-safe arayüzü açsa bile varsayılanlar kayıtlıyı ezmesin).
+  const [settingsLoaded, setSettingsLoaded] = useState(false);
+  // Dinleyicilerin (bir kez kurulan) her zaman güncel değerleri görmesi için.
+  const latest = useRef({});
+  const lastRefillAt = useRef(0);
+  latest.current = {
+    bootstrapped,
+    isRunning,
+    intervalMinutes,
+    alertMode,
+    vibrationIntensity,
+    quietHoursEnabled,
+    quietStart,
+    quietEnd,
+    eyeRestEnabled,
+    workSchedule,
+    streakAlert,
+    userName,
+  };
+
+  async function refreshNextReminder() {
+    setNextReminderAt(await getNextPostureReminderAt());
+  }
+
+  // Kuyrukları bugünden itibaren yeniden doldurur (iOS 64 sınırı ve sonlu
+  // kuyruk nedeniyle): bildirim ulaşınca ve uygulama öne gelince çağrılır.
+  async function refillQueues(force = false) {
+    const c = latest.current;
+    if (!c.bootstrapped) return;
+    const t = Date.now();
+    if (!force && t - lastRefillAt.current < REFILL_MIN_GAP_MS) return;
+    lastRefillAt.current = t;
+    try {
+      if (c.isRunning) {
+        await scheduleReminder({
+          intervalMinutes: c.intervalMinutes,
+          alertMode: c.alertMode,
+          vibrationIntensity: c.vibrationIntensity,
+          quietHoursEnabled: c.quietHoursEnabled,
+          quietStart: c.quietStart,
+          quietEnd: c.quietEnd,
+          workSchedule: c.workSchedule,
+          userName: c.userName,
+        });
+      }
+      if (c.eyeRestEnabled) {
+        await setEyeRestReminders({
+          enabled: true,
+          quietHoursEnabled: c.quietHoursEnabled,
+          quietStart: c.quietStart,
+          quietEnd: c.quietEnd,
+          workSchedule: c.workSchedule,
+          userName: c.userName,
+        });
+      }
+      await refreshStreakAlerts({ streakAlert: c.streakAlert });
+    } catch (e) {}
+    refreshNextReminder();
+  }
 
   useEffect(() => {
     // Aşağıdaki adımlardan biri (örn. bildirim API'si) hiç yanıt vermezse
@@ -98,24 +167,24 @@ export default function App() {
         streakAlert,
       };
       let name = '';
+      let runningFlag = false;
       try {
-        // Kanal kurulumu (veya herhangi bir adım) başarısız olsa bile
-        // uygulama sonsuza kadar "yükleniyor" ekranında kalmamalı.
-        await ensureChannels();
-        await ensureNotificationCategories();
-        initializeAds();
-
+        // Önce depolamadan oku (native bildirim adımları takılsa bile ayarlar
+        // yüklensin ve güvenle kaydedilebilsin).
         const savedName = await AsyncStorage.getItem(NAME_KEY);
         if (savedName) name = savedName;
 
         const seenOnboarding = await AsyncStorage.getItem(ONBOARDING_KEY);
         setOnboardingSeen(seenOnboarding === 'true');
 
+        runningFlag = (await AsyncStorage.getItem(RUNNING_KEY)) === 'true';
+
+        // getItem hata verirse dış catch'e düşer: settingsLoaded açılmaz.
+        const raw = await AsyncStorage.getItem(SETTINGS_KEY);
         // Bozuk ayar verisi kullanıcı adını/kuyruk yenilemeyi engellemesin diye
         // ayrı try/catch (yoksa isim state'e hiç yazılmaz, NameScreen tekrar çıkar).
         let saved = null;
         try {
-          const raw = await AsyncStorage.getItem(SETTINGS_KEY);
           const p = raw ? JSON.parse(raw) : null;
           if (p && typeof p === 'object' && !Array.isArray(p)) saved = p;
         } catch (e) {}
@@ -154,19 +223,38 @@ export default function App() {
         setEyeRestEnabled(settings.eyeRestEnabled);
         setWorkSchedule(settings.workSchedule);
         setStreakAlert(settings.streakAlert);
+        setIsRunning(runningFlag); // kalıcı bayrak: kuyruk boş olsa da 'çalışıyor'
+        setSettingsLoaded(true);
         setTodayReminderCount(await getTodayReminderCount());
+      } catch (e) {
+        // Depolama okunamazsa varsayılanlarla devam et; settingsLoaded false
+        // kaldığı için bu oturumda ayarlar diske YAZILMAZ (kayıtlı veri ezilmez).
+      }
 
-        // Gerçek durumu işletim sisteminden oku: duruş hatırlatıcısı zaten
-        // zamanlanmış mı? (Göz dinlendirme ayrı bir kategoride zamanlandığı
-        // için bu sayıma karışmaz.)
-        const wasRunning = await isPostureReminderScheduled();
+      try {
+        // Kanal kurulumu (veya herhangi bir adım) başarısız olsa bile
+        // uygulama sonsuza kadar "yükleniyor" ekranında kalmamalı.
+        await ensureChannels();
+        await ensureNotificationCategories();
+        initializeAds();
+
+        const perm = await Notifications.getPermissionsAsync();
+        // Bayrak yoksa eski sürümden göç: kuyrukta duruş bildirimi varsa çalışıyordu.
+        let wasRunning = runningFlag || (await isPostureReminderScheduled());
+        if (wasRunning && !perm.granted) {
+          // İzin geri alınmış: hiçbir şey gösterilemez, 'çalışıyor' yalan olur.
+          wasRunning = false;
+          await cancelPostureReminders();
+          await AsyncStorage.removeItem(RUNNING_KEY).catch(() => {});
+        }
         setIsRunning(wasRunning);
         // Zamanlama sonlu bir kuyruk olduğu için, uygulama her açıldığında
         // kuyruğu bugünden itibaren yeniden doldur.
         if (wasRunning) {
+          await AsyncStorage.setItem(RUNNING_KEY, 'true').catch(() => {});
           await scheduleReminder({ ...settings, userName: name });
         }
-        if (settings.eyeRestEnabled) {
+        if (settings.eyeRestEnabled && perm.granted) {
           await setEyeRestReminders({
             enabled: true,
             quietHoursEnabled: settings.quietHoursEnabled,
@@ -176,9 +264,17 @@ export default function App() {
             userName: name,
           });
         }
-        await refreshStreakAlerts({ streakAlert: settings.streakAlert });
+        // İzin açıkça reddedilmişse seri uyarısı ayarı 'açık' görünüp boşa
+        // durmasın: kapalıya çevir (henüz sorulmadıysa dokunma).
+        let streak = settings.streakAlert;
+        if (streak.enabled && perm.status === 'denied' && !perm.canAskAgain) {
+          streak = { ...streak, enabled: false };
+          setStreakAlert(streak);
+        }
+        await refreshStreakAlerts({ streakAlert: streak });
+        setNextReminderAt(await getNextPostureReminderAt());
       } catch (e) {
-        // Kayıtlı ayar okunamazsa varsayılanlarla devam et
+        // Bildirim adımları başarısızsa uygulama yine açılsın
       }
       clearTimeout(failSafe);
       setBootstrapped(true);
@@ -191,8 +287,16 @@ export default function App() {
   // verirse bile bu, tüm uygulamayı çökertmesin diye try/catch ile sarıldı.
   useEffect(() => {
     try {
-      const subscription = Notifications.addNotificationReceivedListener(() => {
-        incrementTodayReminderCount().then(setTodayReminderCount);
+      const subscription = Notifications.addNotificationReceivedListener((notification) => {
+        const category =
+          notification && notification.request && notification.request.content
+            ? notification.request.content.categoryIdentifier
+            : null;
+        if (category === POSTURE_CATEGORY) {
+          incrementTodayReminderCount().then(setTodayReminderCount);
+        }
+        // Bir bildirim tükendi: kuyruğu tazele (iOS 64 sınırı / sonlu kuyruk).
+        refillQueues();
       });
       return () => subscription.remove();
     } catch (e) {
@@ -220,8 +324,16 @@ export default function App() {
     }
   }, [alertMode, vibrationIntensity, userName]);
 
+  // Uygulama arka plandan öne gelince kuyrukları tazele.
   useEffect(() => {
-    if (!bootstrapped) return;
+    const sub = AppState.addEventListener('change', (state) => {
+      if (state === 'active') refillQueues();
+    });
+    return () => sub.remove();
+  }, []);
+
+  useEffect(() => {
+    if (!settingsLoaded) return;
     AsyncStorage.setItem(
       SETTINGS_KEY,
       JSON.stringify({
@@ -237,7 +349,7 @@ export default function App() {
       })
     ).catch(() => {});
   }, [
-    bootstrapped,
+    settingsLoaded,
     intervalMinutes,
     alertMode,
     vibrationIntensity,
@@ -270,6 +382,11 @@ export default function App() {
     };
   }
 
+  async function reschedulePosture(settings) {
+    await scheduleReminder(settings);
+    await refreshNextReminder();
+  }
+
   async function refreshEyeRest(overrides = {}) {
     await setEyeRestReminders({
       enabled: eyeRestEnabled,
@@ -286,7 +403,7 @@ export default function App() {
     setUserName(name);
     await AsyncStorage.setItem(NAME_KEY, name).catch(() => {});
     if (isRunning) {
-      await scheduleReminder(currentSettings({ userName: name }));
+      await reschedulePosture(currentSettings({ userName: name }));
     }
     if (eyeRestEnabled) {
       await refreshEyeRest({ userName: name });
@@ -296,40 +413,45 @@ export default function App() {
   async function handleStartStop() {
     if (isRunning) {
       await cancelPostureReminders();
+      await AsyncStorage.removeItem(RUNNING_KEY).catch(() => {});
       setIsRunning(false);
+      setNextReminderAt(null);
       return;
     }
     const ok = await requestPermission();
     if (!ok) return;
-    await scheduleReminder(currentSettings());
+    await AsyncStorage.setItem(RUNNING_KEY, 'true').catch(() => {});
     setIsRunning(true);
+    await reschedulePosture(currentSettings());
+    // İzin yeni verildiyse seri uyarısı da şimdi planlanabilir.
+    refreshStreakAlerts({ streakAlert });
   }
 
   async function handleIntervalCommit(minutes) {
     setIntervalMinutes(minutes);
     if (isRunning) {
-      await scheduleReminder(currentSettings({ intervalMinutes: minutes }));
+      await reschedulePosture(currentSettings({ intervalMinutes: minutes }));
     }
   }
 
   async function handleAlertModeChange(mode) {
     setAlertMode(mode);
     if (isRunning) {
-      await scheduleReminder(currentSettings({ alertMode: mode }));
+      await reschedulePosture(currentSettings({ alertMode: mode }));
     }
   }
 
   async function handleVibrationIntensityChange(intensity) {
     setVibrationIntensity(intensity);
     if (isRunning) {
-      await scheduleReminder(currentSettings({ vibrationIntensity: intensity }));
+      await reschedulePosture(currentSettings({ vibrationIntensity: intensity }));
     }
   }
 
   async function handleQuietHoursToggle(value) {
     setQuietHoursEnabled(value);
     if (isRunning) {
-      await scheduleReminder(currentSettings({ quietHoursEnabled: value }));
+      await reschedulePosture(currentSettings({ quietHoursEnabled: value }));
     }
     if (eyeRestEnabled) {
       await refreshEyeRest({ quietHoursEnabled: value });
@@ -339,7 +461,7 @@ export default function App() {
   async function handleQuietStartChange(hour) {
     setQuietStart(hour);
     if (isRunning) {
-      await scheduleReminder(currentSettings({ quietStart: hour }));
+      await reschedulePosture(currentSettings({ quietStart: hour }));
     }
     if (eyeRestEnabled) {
       await refreshEyeRest({ quietStart: hour });
@@ -349,7 +471,7 @@ export default function App() {
   async function handleQuietEndChange(hour) {
     setQuietEnd(hour);
     if (isRunning) {
-      await scheduleReminder(currentSettings({ quietEnd: hour }));
+      await reschedulePosture(currentSettings({ quietEnd: hour }));
     }
     if (eyeRestEnabled) {
       await refreshEyeRest({ quietEnd: hour });
@@ -364,7 +486,7 @@ export default function App() {
   async function handleWorkScheduleChange(next) {
     setWorkSchedule(next);
     if (isRunning) {
-      await scheduleReminder(currentSettings({ workSchedule: next }));
+      await reschedulePosture(currentSettings({ workSchedule: next }));
     }
     if (eyeRestEnabled) {
       await refreshEyeRest({ workSchedule: next });
@@ -375,7 +497,13 @@ export default function App() {
     setStreakAlert(next);
     if (next.enabled) {
       const ok = await requestPermission();
-      if (!ok) return;
+      if (!ok) {
+        // İzin yok: ayar 'açık' görünüp hiçbir şey planlamasın.
+        const off = { ...next, enabled: false };
+        setStreakAlert(off);
+        await refreshStreakAlerts({ streakAlert: off });
+        return;
+      }
     }
     await refreshStreakAlerts({ streakAlert: next });
   }
@@ -442,6 +570,7 @@ export default function App() {
                 quietStart={quietStart}
                 quietEnd={quietEnd}
                 todayReminderCount={todayReminderCount}
+                nextReminderAt={isRunning ? nextReminderAt : null}
                 onStartStop={handleStartStop}
                 onIntervalCommit={handleIntervalCommit}
               />
