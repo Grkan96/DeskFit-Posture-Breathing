@@ -12,13 +12,13 @@ function initialSession(phases) {
 }
 
 // technique: { id, phases: [{phaseKey, seconds, scale}], cycles }
-export default function BreathingSession({ technique, onBack }) {
+export default function BreathingSession({ technique, onBack, autoStart = false, onComplete, backLabel }) {
   const colors = useThemeColors();
   const styles = createStyles(colors);
   const { t } = useTranslation();
   const { phases, cycles, id } = technique;
   const title = t(`breathing.techniques.${id}.title`);
-  const [running, setRunning] = useState(false);
+  const [running, setRunning] = useState(autoStart);
   const [finished, setFinished] = useState(false);
   const [session, setSession] = useState(() => initialSession(phases));
   const scaleAnim = useRef(new Animated.Value(REST_SCALE)).current;
@@ -52,7 +52,9 @@ export default function BreathingSession({ technique, onBack }) {
     if (session.done) {
       setRunning(false);
       setFinished(true);
-      recordSessionCompleted('breathing').then(celebrateIfMilestone);
+      // onComplete verilmişse (hızlı mola akışı) kayıt akışın sonunda yapılır.
+      if (onComplete) onComplete();
+      else recordSessionCompleted('breathing').then(celebrateIfMilestone);
     }
   }, [session.done]);
 
@@ -86,7 +88,7 @@ export default function BreathingSession({ technique, onBack }) {
   return (
     <View style={styles.container}>
       <Pressable onPress={onBack} style={styles.backButton} hitSlop={10}>
-        <Text style={styles.backText}>{t('breathing.backToTechniques')}</Text>
+        <Text style={styles.backText}>{backLabel || t('breathing.backToTechniques')}</Text>
       </Pressable>
 
       <Text style={styles.title}>{title}</Text>

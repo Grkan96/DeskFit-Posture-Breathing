@@ -5,7 +5,12 @@ import MovementsScreen from './MovementsScreen';
 import ExercisesScreen from './ExercisesScreen';
 import StatsScreen from './StatsScreen';
 import AdBanner from '../components/AdBanner';
-import { getStats } from '../lib/stats';
+import BreathingSession from '../components/BreathingSession';
+import QuickBreak from '../components/QuickBreak';
+import { getStats, startPostureChallenge } from '../lib/stats';
+import { CHALLENGE_DAYS } from '../lib/challenge';
+import { TECHNIQUES } from '../lib/breathingTechniques';
+import { pickSuggestion } from '../lib/sessionContent';
 import { useThemeColors } from '../lib/theme';
 import { useTranslation } from '../lib/i18n';
 
@@ -46,14 +51,42 @@ export default function MeditationScreen() {
     }
   }, [activeSession]);
 
+  // "Bugünün önerisi": en az yapılan tür (eşitlikte güne göre döner).
+  const suggestion = pickSuggestion(stats && stats.byType, new Date(), TECHNIQUES.length);
+  const challenge = stats && stats.challenge;
+  const back = () => setActiveSession(null);
+
+  function handleStartChallenge() {
+    startPostureChallenge().then(setStats);
+  }
+
+  if (activeSession === 'quick') {
+    return <QuickBreak onBack={back} />;
+  }
+  if (activeSession === 'suggest-breathing') {
+    return (
+      <BreathingSession
+        technique={TECHNIQUES[suggestion.techniqueIndex]}
+        onBack={back}
+        autoStart
+        backLabel={t('stepSession.backToMeditation')}
+      />
+    );
+  }
+  if (activeSession === 'suggest-movements') {
+    return <MovementsScreen onBack={back} autoStart />;
+  }
+  if (activeSession === 'suggest-exercises') {
+    return <ExercisesScreen onBack={back} autoStart />;
+  }
   if (activeSession === 'breathing') {
-    return <BreathingScreen onBack={() => setActiveSession(null)} />;
+    return <BreathingScreen onBack={back} />;
   }
   if (activeSession === 'movements') {
-    return <MovementsScreen onBack={() => setActiveSession(null)} />;
+    return <MovementsScreen onBack={back} />;
   }
   if (activeSession === 'exercises') {
-    return <ExercisesScreen onBack={() => setActiveSession(null)} />;
+    return <ExercisesScreen onBack={back} />;
   }
   if (activeSession === 'stats') {
     return <StatsScreen onBack={() => setActiveSession(null)} />;
@@ -81,7 +114,49 @@ export default function MeditationScreen() {
         </Pressable>
       )}
 
+      {challenge && (
+        <View style={styles.challengeCard}>
+          <Text style={styles.challengeTitle}>{t('challenge.sectionLabel')}</Text>
+          {challenge.active || challenge.completed ? (
+            <Pressable onPress={() => setActiveSession('stats')} hitSlop={6}>
+              <Text style={styles.challengeBody}>
+                {challenge.completed
+                  ? t('challenge.completedLabel')
+                  : `${t('challenge.progress', { done: challenge.doneDates.length, total: CHALLENGE_DAYS })} · ${t('challenge.todayGoal')}`}
+              </Text>
+            </Pressable>
+          ) : (
+            <>
+              <Text style={styles.challengeBody}>{t('challenge.intro')}</Text>
+              <Pressable onPress={handleStartChallenge} style={styles.challengeButton}>
+                <Text style={styles.challengeButtonText}>{t('challenge.startButton')}</Text>
+              </Pressable>
+            </>
+          )}
+        </View>
+      )}
+
       <View style={styles.cardList}>
+        <CategoryCard
+          styles={styles}
+          icon="⚡"
+          ready
+          title={t('meditation.quickBreakTitle')}
+          description={t('meditation.quickBreakDescription')}
+          badgeLabel={t('meditation.badgeReady')}
+          onPress={() => setActiveSession('quick')}
+        />
+        <CategoryCard
+          styles={styles}
+          icon="🎯"
+          ready
+          title={t('meditation.suggestionTitle')}
+          description={t('meditation.suggestionBody', {
+            name: t(`meditation.categories.${suggestion.type}.title`),
+          })}
+          badgeLabel={t('meditation.badgeReady')}
+          onPress={() => setActiveSession(`suggest-${suggestion.type}`)}
+        />
         {CATEGORIES.map((category) => {
           const title = t(`meditation.categories.${category.id}.title`);
           const description = t(`meditation.categories.${category.id}.description`);
@@ -164,6 +239,37 @@ function createStyles(colors) {
       fontWeight: '600',
       color: colors.faint,
       marginTop: 2,
+    },
+    challengeCard: {
+      alignSelf: 'stretch',
+      backgroundColor: colors.accentSofter,
+      borderRadius: 16,
+      padding: 16,
+      marginTop: 16,
+    },
+    challengeTitle: {
+      fontSize: 14,
+      fontWeight: '800',
+      color: colors.accentText,
+    },
+    challengeBody: {
+      marginTop: 4,
+      fontSize: 12,
+      color: colors.text,
+      lineHeight: 17,
+    },
+    challengeButton: {
+      marginTop: 10,
+      alignSelf: 'flex-start',
+      backgroundColor: colors.accent,
+      borderRadius: 10,
+      paddingHorizontal: 16,
+      paddingVertical: 8,
+    },
+    challengeButtonText: {
+      color: '#ffffff',
+      fontSize: 13,
+      fontWeight: '700',
     },
     cardList: {
       alignSelf: 'stretch',
