@@ -30,6 +30,7 @@ import {
   DEFAULT_GOAL,
 } from './lib/checkins';
 import { translate } from './lib/i18n';
+import { maybeRequestReviewOnGoalReached } from './lib/review';
 import { useThemeColors } from './lib/theme';
 import NameScreen from './screens/NameScreen';
 import OnboardingScreen from './screens/OnboardingScreen';
@@ -230,7 +231,8 @@ export default function App() {
         Alert.alert(
           translate('checkin.goalReachedTitle'),
           translate('checkin.goalReachedBody', { goal: result.goal }),
-          [{ text: translate('sharing.closeCta') }]
+          // Değerlendirme isteği, kutlama kapatıldıktan sonra (mutlu anda) gelir.
+          [{ text: translate('sharing.closeCta'), onPress: () => maybeRequestReviewOnGoalReached() }]
         );
       }
     } catch (e) {
