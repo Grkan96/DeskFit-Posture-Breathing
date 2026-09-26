@@ -1,194 +1,125 @@
-import { useRef, useState } from 'react';
-import { Dimensions, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import * as Haptics from 'expo-haptics';
+import { useEffect, useState } from 'react';
+import { Linking, StyleSheet, Text } from 'react-native';
+import * as Notifications from 'expo-notifications';
+import OnboardingStep from '../components/OnboardingStep';
 import { useThemeColors } from '../lib/theme';
 import { useTranslation } from '../lib/i18n';
+import { saveProfile } from '../lib/onboardingProfile';
 
-const { width } = Dimensions.get('window');
-
+// Onboarding'in ikinci yarısı (isim alındıktan sonra App.js bunu gösterir):
+// 4) bildirim izni ön-ekranı  5) ilk hatırlatmayı başlatma teklifi.
+// onFinish() sözleşmesi korunur; teklif kabul edilirse onFinish({ startReminder: true })
+// çağrılır (mevcut App.js fazladan argümanı yok sayar) ve profile de yazılır.
 export default function OnboardingScreen({ onFinish }) {
   const colors = useThemeColors();
   const styles = createStyles(colors);
   const { t } = useTranslation();
-  const slides = t('onboarding.slides');
-  const [index, setIndex] = useState(0);
-  const scrollRef = useRef(null);
-  const isLast = index === slides.length - 1;
+  const [step, setStep] = useState(4);
+  // 'idle' | 'asking' | 'denied'
+  const [permState, setPermState] = useState('idle');
+  const [granted, setGranted] = useState(false);
 
-  function goToIndex(next) {
-    scrollRef.current?.scrollTo({ x: next * width, animated: true });
-    setIndex(next);
+  // İzin zaten verilmişse ön-ekranı gösterme, doğrudan teklife geç.
+  useEffect(() => {
+    let mounted = true;
+    Notifications.getPermissionsAsync()
+      .then((p) => {
+        if (mounted && p.granted) {
+          setGranted(true);
+          setStep(5);
+        }
+      })
+      .catch(() => {});
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  function finish(startReminder) {
+    saveProfile({
+      notificationsGranted: granted,
+      reminderOffered: startReminder,
+      completedAt: Date.now(),
+    }).catch(() => {});
+    onFinish(startReminder ? { startReminder: true } : undefined);
   }
 
-  function handleNext() {
-    if (isLast) {
-      onFinish();
+  async function askPermission() {
+    setPermState('asking');
+    let ok = false;
+    try {
+      const res = await Notifications.requestPermissionsAsync();
+      ok = !!res.granted;
+    } catch {
+      ok = false;
+    }
+    setGranted(ok);
+    saveProfile({ notificationsGranted: ok }).catch(() => {});
+    if (ok) {
+      setStep(5);
     } else {
-      goToIndex(index + 1);
+      setPermState('denied');
     }
   }
 
-  function handleScrollEnd(event) {
-    const next = Math.round(event.nativeEvent.contentOffset.x / width);
-    setIndex(next);
+  if (step === 4 && permState === 'denied') {
+    return (
+      <OnboardingStep
+        step={4}
+        emoji="🔕"
+        title={t('onboardingFlow.permission.deniedTitle')}
+        subtitle={t('onboardingFlow.permission.deniedBody')}
+        onBack={() => setPermState('idle')}
+        primaryLabel={t('onboardingFlow.permission.continueAnyway')}
+        onPrimary={() => finish(false)}
+        secondaryLabel={t('onboardingFlow.permission.openSettings')}
+        onSecondary={() => Linking.openSettings().catch(() => {})}
+      >
+        <Text style={styles.hint}>{t('onboardingFlow.permission.settingsHint')}</Text>
+      </OnboardingStep>
+    );
+  }
+
+  if (step === 4) {
+    return (
+      <OnboardingStep
+        step={4}
+        emoji="🔔"
+        title={t('onboardingFlow.permission.title')}
+        subtitle={t('onboardingFlow.permission.body')}
+        onSkip={() => finish(false)}
+        primaryLabel={t('onboardingFlow.permission.allow')}
+        primaryDisabled={permState === 'asking'}
+        onPrimary={askPermission}
+      >
+        <Text style={styles.hint}>{t('onboardingFlow.permission.note')}</Text>
+      </OnboardingStep>
+    );
   }
 
   return (
-    <View style={styles.container}>
-      <ScrollView
-        ref={scrollRef}
-        horizontal
-        pagingEnabled
-        showsHorizontalScrollIndicator={false}
-        onMomentumScrollEnd={handleScrollEnd}
-        style={styles.scroll}
-      >
-        {slides.map((slide, i) => (
-          <View key={i} style={[styles.slide, { width }]}>
-            <View style={styles.emojiCircle}>
-              <Text style={styles.emoji}>{slide.emoji}</Text>
-            </View>
-            <Text style={styles.title} accessibilityRole="header">
-              {slide.title}
-            </Text>
-            <Text style={styles.description}>{slide.description}</Text>
-          </View>
-        ))}
-      </ScrollView>
-
-      <View style={styles.footer}>
-        <View
-          style={styles.dots}
-          accessible
-          accessibilityRole="progressbar"
-          accessibilityValue={{ min: 1, max: slides.length, now: index + 1 }}
-        >
-          {slides.map((slide, i) => (
-            <View key={i} style={[styles.dot, i === index && styles.dotActive]} />
-          ))}
-        </View>
-
-        <Pressable
-          onPress={() => {
-            Haptics.selectionAsync().catch(() => {});
-            handleNext();
-          }}
-          accessibilityRole="button"
-          accessibilityLabel={isLast ? t('onboarding.start') : t('onboarding.next')}
-          style={({ pressed }) => [styles.button, pressed && styles.buttonPressed]}
-        >
-          <Text style={styles.buttonText}>{isLast ? t('onboarding.start') : t('onboarding.next')}</Text>
-        </Pressable>
-
-        {!isLast && (
-          <Pressable
-            onPress={onFinish}
-            hitSlop={8}
-            accessibilityRole="button"
-            accessibilityLabel={t('onboarding.skip')}
-            style={styles.skipButton}
-          >
-            <Text style={styles.skipText}>{t('onboarding.skip')}</Text>
-          </Pressable>
-        )}
-      </View>
-    </View>
+    <OnboardingStep
+      step={5}
+      emoji="🚀"
+      title={t('onboardingFlow.start.title')}
+      subtitle={t('onboardingFlow.start.body')}
+      onBack={granted ? undefined : () => setStep(4)}
+      primaryLabel={t('onboardingFlow.start.startNow')}
+      onPrimary={() => finish(true)}
+      secondaryLabel={t('onboardingFlow.start.later')}
+      onSecondary={() => finish(false)}
+    />
   );
 }
 
 function createStyles(colors) {
   return StyleSheet.create({
-    container: {
-      flex: 1,
-      backgroundColor: colors.bg,
-    },
-    scroll: {
-      flex: 1,
-    },
-    slide: {
-      alignItems: 'center',
-      justifyContent: 'center',
-      paddingHorizontal: 32,
-    },
-    emojiCircle: {
-      width: 132,
-      height: 132,
-      borderRadius: 66,
-      alignItems: 'center',
-      justifyContent: 'center',
-      marginBottom: 28,
-      backgroundColor: colors.accentSofter,
-      elevation: 4,
-      shadowColor: colors.shadow,
-      shadowOpacity: 0.12,
-      shadowRadius: 14,
-      shadowOffset: { width: 0, height: 6 },
-    },
-    emoji: {
-      fontSize: 64,
-    },
-    title: {
-      fontSize: 26,
-      fontWeight: '800',
-      letterSpacing: -0.3,
-      color: colors.text,
-      textAlign: 'center',
-    },
-    description: {
-      marginTop: 10,
-      fontSize: 16,
-      color: colors.subtext,
-      textAlign: 'center',
-      lineHeight: 24,
-    },
-    footer: {
-      paddingHorizontal: 32,
-      paddingBottom: 32,
-      alignItems: 'center',
-    },
-    dots: {
-      flexDirection: 'row',
-      gap: 8,
-      marginBottom: 20,
-    },
-    dot: {
-      width: 8,
-      height: 8,
-      borderRadius: 4,
-      backgroundColor: colors.borderStrong,
-    },
-    dotActive: {
-      backgroundColor: colors.accent,
-      width: 20,
-    },
-    button: {
-      alignSelf: 'stretch',
-      backgroundColor: colors.accent,
-      borderRadius: 16,
-      minHeight: 52,
-      paddingVertical: 14,
-      alignItems: 'center',
-      justifyContent: 'center',
-    },
-    buttonPressed: {
-      opacity: 0.85,
-      transform: [{ scale: 0.98 }],
-    },
-    buttonText: {
-      color: colors.onAccent,
-      fontSize: 16,
-      fontWeight: '700',
-    },
-    skipButton: {
-      marginTop: 8,
-      minHeight: 44,
-      paddingHorizontal: 20,
-      justifyContent: 'center',
-    },
-    skipText: {
+    hint: {
+      marginTop: 16,
       fontSize: 14,
-      fontWeight: '600',
+      lineHeight: 20,
       color: colors.muted,
+      textAlign: 'center',
     },
   });
 }
