@@ -4,6 +4,7 @@ import { useTranslation } from '../lib/i18n';
 
 const TABS = [
   { key: 'home', labelKey: 'tabBar.home', icon: '🏠' },
+  { key: 'focus', labelKey: 'tabBar.focus', icon: '⏱️' },
   { key: 'meditation', labelKey: 'tabBar.meditation', icon: '🧘' },
   { key: 'settings', labelKey: 'tabBar.settings', icon: '⚙️' },
 ];
