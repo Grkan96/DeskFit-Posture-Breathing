@@ -27,6 +27,7 @@ import HomeScreen from './screens/HomeScreen';
 import MeditationScreen from './screens/MeditationScreen';
 import SettingsScreen from './screens/SettingsScreen';
 import TabBar from './components/TabBar';
+import SharePreviewModal from './components/SharePreviewModal';
 
 const SETTINGS_KEY = 'durus-hatirlatici/settings';
 const NAME_KEY = 'durus-hatirlatici/username';
@@ -399,6 +400,7 @@ export default function App() {
             )}
           </View>
           <TabBar activeTab={activeTab} onChange={setActiveTab} />
+          <SharePreviewModal />
         </SafeAreaView>
       </SafeAreaProvider>
     </GestureHandlerRootView>
