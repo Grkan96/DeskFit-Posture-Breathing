@@ -1,5 +1,7 @@
+import { useEffect, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
-import { adsAvailable, BANNER_AD_UNIT_ID } from '../lib/ads';
+import { adsAvailable, initializeAds, BANNER_AD_UNIT_ID } from '../lib/ads';
+import { canRequestAds } from '../lib/consent';
 import { useThemeColors } from '../lib/theme';
 
 // Statik `import` yerine koşullu `require`: Expo Go'da bu satır hiç
@@ -13,6 +15,20 @@ if (adsAvailable()) {
 export default function AdBanner() {
   const colors = useThemeColors();
   const styles = createStyles(colors);
+  // GDPR/UMP: onay alınmadan (AB'de reddedilmişse hiç) reklam isteği gitmesin.
+  const [consented, setConsented] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+    if (AdComponents) {
+      initializeAds().then(() => {
+        if (active) setConsented(canRequestAds());
+      });
+    }
+    return () => {
+      active = false;
+    };
+  }, []);
 
   if (!AdComponents) {
     if (__DEV__) {
@@ -26,6 +42,8 @@ export default function AdBanner() {
     }
     return null;
   }
+
+  if (!consented) return null;
 
   const { BannerAd, BannerAdSize } = AdComponents;
   return (
