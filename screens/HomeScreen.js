@@ -1,6 +1,7 @@
 import { useState } from 'react';
-import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import TimeSlider from '../components/TimeSlider';
+import GoalRing from '../components/GoalRing';
 import { useThemeColors } from '../lib/theme';
 import { useTranslation } from '../lib/i18n';
 
@@ -20,6 +21,10 @@ export default function HomeScreen({
   quietStart,
   quietEnd,
   todayReminderCount,
+  checkinCount = 0,
+  dailyGoal = 8,
+  checkinStreak = 0,
+  onCheckin,
   onStartStop,
   onIntervalCommit,
 }) {
@@ -37,8 +42,14 @@ export default function HomeScreen({
     setCustomText('');
   }
 
+  const goalMet = checkinCount >= dailyGoal;
+
   return (
-    <View style={styles.container}>
+    <ScrollView
+      style={styles.scroll}
+      contentContainerStyle={styles.container}
+      keyboardShouldPersistTaps="handled"
+    >
       <Text style={styles.greeting}>{t('home.greeting', { name: userName })}</Text>
       <Text style={styles.subtitle}>
         {isRunning
@@ -54,15 +65,49 @@ export default function HomeScreen({
         </Text>
       )}
 
+      {/* Günlük hedef halkası + Başlat/Durdur butonu yan yana */}
+      <View style={styles.heroRow}>
+        <View
+          accessible
+          accessibilityRole="progressbar"
+          accessibilityLabel={t('checkin.ringAccessibilityLabel', {
+            count: checkinCount,
+            goal: dailyGoal,
+          })}
+        >
+          <GoalRing progress={dailyGoal > 0 ? checkinCount / dailyGoal : 0} size={132} thickness={11}>
+            <Text style={styles.ringValue}>
+              {checkinCount}/{dailyGoal}
+            </Text>
+            <Text style={styles.ringLabel}>{goalMet ? t('checkin.ringDone') : t('checkin.ringLabel')}</Text>
+          </GoalRing>
+        </View>
+
+        <Pressable
+          onPress={onStartStop}
+          style={({ pressed }) => [
+            styles.mainButton,
+            isRunning ? styles.mainButtonStop : styles.mainButtonStart,
+            pressed && styles.mainButtonPressed,
+          ]}
+        >
+          <Text style={styles.mainButtonText}>{isRunning ? t('home.stop') : t('home.start')}</Text>
+        </Pressable>
+      </View>
+
+      <Text style={styles.streakText}>
+        {checkinStreak > 0
+          ? t('checkin.streak', { count: checkinStreak })
+          : t('checkin.streakEmpty')}
+      </Text>
+
       <Pressable
-        onPress={onStartStop}
-        style={({ pressed }) => [
-          styles.mainButton,
-          isRunning ? styles.mainButtonStop : styles.mainButtonStart,
-          pressed && styles.mainButtonPressed,
-        ]}
+        onPress={onCheckin}
+        accessibilityRole="button"
+        accessibilityLabel={t('checkin.button')}
+        style={({ pressed }) => [styles.checkinButton, pressed && styles.checkinButtonPressed]}
       >
-        <Text style={styles.mainButtonText}>{isRunning ? t('home.stop') : t('home.start')}</Text>
+        <Text style={styles.checkinButtonText}>{t('checkin.button')}</Text>
       </Pressable>
 
       <Text style={styles.sectionLabel}>{t('home.intervalSectionLabel')}</Text>
@@ -106,17 +151,66 @@ export default function HomeScreen({
       </View>
 
       <TimeSlider minutes={intervalMinutes} onChange={onIntervalCommit} />
-    </View>
+    </ScrollView>
   );
 }
 
 function createStyles(colors) {
   return StyleSheet.create({
-    container: {
+    scroll: {
       flex: 1,
+    },
+    container: {
       alignItems: 'center',
       paddingHorizontal: 24,
       paddingTop: 16,
+      paddingBottom: 24,
+    },
+    heroRow: {
+      marginTop: 16,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 24,
+    },
+    ringValue: {
+      fontSize: 26,
+      fontWeight: '800',
+      color: colors.text,
+    },
+    ringLabel: {
+      marginTop: 2,
+      fontSize: 11,
+      fontWeight: '600',
+      color: colors.muted,
+      textAlign: 'center',
+      paddingHorizontal: 16,
+    },
+    streakText: {
+      marginTop: 12,
+      fontSize: 13,
+      fontWeight: '700',
+      color: colors.subtext,
+    },
+    checkinButton: {
+      marginTop: 12,
+      marginBottom: 20,
+      alignSelf: 'stretch',
+      paddingVertical: 14,
+      borderRadius: 14,
+      backgroundColor: colors.accentSofter,
+      borderWidth: 1.5,
+      borderColor: colors.accent,
+      alignItems: 'center',
+    },
+    checkinButtonPressed: {
+      opacity: 0.8,
+      transform: [{ scale: 0.98 }],
+    },
+    checkinButtonText: {
+      fontSize: 17,
+      fontWeight: '800',
+      color: colors.accentText,
     },
     greeting: {
       fontSize: 20,
@@ -136,11 +230,9 @@ function createStyles(colors) {
       color: colors.accent,
     },
     mainButton: {
-      marginTop: 20,
-      marginBottom: 20,
-      width: 140,
-      height: 140,
-      borderRadius: 70,
+      width: 116,
+      height: 116,
+      borderRadius: 58,
       alignItems: 'center',
       justifyContent: 'center',
       elevation: 6,

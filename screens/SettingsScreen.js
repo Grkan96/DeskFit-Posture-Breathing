@@ -4,6 +4,7 @@ import AdBanner from '../components/AdBanner';
 import { useThemeColors, useThemePreference } from '../lib/theme';
 import { useTranslation } from '../lib/i18n';
 import { shareApp } from '../lib/sharing';
+import { MIN_GOAL, MAX_GOAL } from '../lib/checkins';
 
 const THEME_MODES = [
   { key: 'system', labelKey: 'settings.themeSystem', icon: '🌓' },
@@ -85,6 +86,36 @@ function HourStepper({ styles, label, hour, onChange }) {
   );
 }
 
+// HourStepper ile aynı görünüm; günlük check-in hedefi için sınırlı (döngüsüz) sayaç.
+function GoalStepper({ styles, label, value, onChange }) {
+  const canDecrease = value > MIN_GOAL;
+  const canIncrease = value < MAX_GOAL;
+  return (
+    <View style={styles.stepperRow}>
+      <Text style={styles.stepperLabel}>{label}</Text>
+      <View style={styles.stepperControl}>
+        <Pressable
+          onPress={() => canDecrease && onChange(value - 1)}
+          disabled={!canDecrease}
+          style={[styles.stepperButton, !canDecrease && styles.stepperButtonDisabled]}
+          hitSlop={8}
+        >
+          <Text style={styles.stepperButtonText}>–</Text>
+        </Pressable>
+        <Text style={styles.stepperValue}>{value}</Text>
+        <Pressable
+          onPress={() => canIncrease && onChange(value + 1)}
+          disabled={!canIncrease}
+          style={[styles.stepperButton, !canIncrease && styles.stepperButtonDisabled]}
+          hitSlop={8}
+        >
+          <Text style={styles.stepperButtonText}>+</Text>
+        </Pressable>
+      </View>
+    </View>
+  );
+}
+
 export default function SettingsScreen({
   userName,
   onNameChange,
@@ -100,6 +131,8 @@ export default function SettingsScreen({
   onQuietEndChange,
   eyeRestEnabled,
   onEyeRestToggle,
+  dailyGoal,
+  onDailyGoalChange,
   onTestNotification,
 }) {
   const colors = useThemeColors();
@@ -180,6 +213,19 @@ export default function SettingsScreen({
             />
           </View>
         )}
+      </View>
+
+      <View style={styles.card}>
+        <Text style={styles.settingLabel}>{t('settings.dailyGoalLabel')}</Text>
+        <Text style={styles.settingHint}>{t('settings.dailyGoalHint')}</Text>
+        <View style={styles.steppersBlock}>
+          <GoalStepper
+            styles={styles}
+            label={t('settings.dailyGoalStepperLabel')}
+            value={dailyGoal}
+            onChange={onDailyGoalChange}
+          />
+        </View>
       </View>
 
       <View style={styles.card}>
@@ -360,6 +406,9 @@ function createStyles(colors) {
       backgroundColor: colors.border,
       alignItems: 'center',
       justifyContent: 'center',
+    },
+    stepperButtonDisabled: {
+      opacity: 0.4,
     },
     stepperButtonText: {
       fontSize: 17,
