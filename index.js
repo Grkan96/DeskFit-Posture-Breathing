@@ -1,3 +1,4 @@
+import './lib/ignoreWarnings';
 import 'react-native-gesture-handler';
 import { registerRootComponent } from 'expo';
 
