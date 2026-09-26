@@ -1,6 +1,23 @@
-import { useState } from 'react';
-import { Alert, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
+import { useCallback, useEffect, useState } from 'react';
+import {
+  AccessibilityInfo,
+  Alert,
+  AppState,
+  Linking,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Switch,
+  Text,
+  TextInput,
+  View,
+} from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as Notifications from 'expo-notifications';
 import AdBanner from '../components/AdBanner';
+import SettingsSection from '../components/SettingsSection';
+import { isPrivacyOptionsRequired, showPrivacyOptions } from '../lib/consent';
+import appConfig from '../app.json';
 import { useThemeColors, useThemePreference } from '../lib/theme';
 import { useTranslation } from '../lib/i18n';
 import { shareApp } from '../lib/sharing';
@@ -48,6 +65,24 @@ function formatMinutes(minutes) {
   const h = String(Math.floor(minutes / 60)).padStart(2, '0');
   const m = String(minutes % 60).padStart(2, '0');
   return `${h}:${m}`;
+}
+
+const SECTIONS_KEY = 'settings.sections.v1';
+const DEFAULT_OPEN = { reminder: true, appearance: false, share: false, about: false };
+
+function NotificationDeniedHint({ styles, t }) {
+  return (
+    <View style={styles.deniedBox}>
+      <Text style={styles.deniedText}>{t('settings.notifDeniedHint')}</Text>
+      <Pressable
+        onPress={() => Linking.openSettings().catch(() => {})}
+        accessibilityRole="button"
+        style={styles.quickButton}
+      >
+        <Text style={styles.quickButtonText}>{t('settings.notifOpenSettings')}</Text>
+      </Pressable>
+    </View>
+  );
 }
 
 function SegmentedControl({ styles, options, value, onChange, t, wrap }) {
@@ -157,6 +192,62 @@ export default function SettingsScreen({
 
   const weekdays = t('settings.weekdaysShort');
 
+  const [openSections, setOpenSections] = useState(DEFAULT_OPEN);
+  const [reduceMotion, setReduceMotion] = useState(false);
+  const [notifDenied, setNotifDenied] = useState(false);
+  const [privacyOptionsRequired, setPrivacyOptionsRequired] = useState(false);
+
+  const isOpen = (id) => !!openSections[id];
+
+  function toggleSection(id) {
+    setOpenSections((prev) => {
+      const next = { ...prev, [id]: !prev[id] };
+      AsyncStorage.setItem(
+        SECTIONS_KEY,
+        JSON.stringify({ open: next, last: next[id] ? id : null })
+      ).catch(() => {});
+      return next;
+    });
+  }
+
+  useEffect(() => {
+    let mounted = true;
+    AsyncStorage.getItem(SECTIONS_KEY)
+      .then((raw) => {
+        if (!mounted || !raw) return;
+        const parsed = JSON.parse(raw);
+        if (parsed && typeof parsed.open === 'object' && parsed.open) {
+          setOpenSections({ ...DEFAULT_OPEN, ...parsed.open });
+        }
+      })
+      .catch(() => {});
+    AccessibilityInfo.isReduceMotionEnabled()
+      .then((v) => mounted && setReduceMotion(!!v))
+      .catch(() => {});
+    const sub = AccessibilityInfo.addEventListener('reduceMotionChanged', (v) => setReduceMotion(!!v));
+    isPrivacyOptionsRequired()
+      .then((v) => mounted && setPrivacyOptionsRequired(!!v))
+      .catch(() => {});
+    return () => {
+      mounted = false;
+      sub?.remove?.();
+    };
+  }, []);
+
+  const refreshNotifPermission = useCallback(() => {
+    Notifications.getPermissionsAsync()
+      .then((p) => setNotifDenied(!p.granted && p.status === 'denied'))
+      .catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    refreshNotifPermission();
+    const sub = AppState.addEventListener('change', (s) => {
+      if (s === 'active') refreshNotifPermission();
+    });
+    return () => sub.remove();
+  }, [refreshNotifPermission]);
+
   function toggleWorkDay(day) {
     const days = workSchedule.days.includes(day)
       ? workSchedule.days.filter((d) => d !== day)
@@ -192,29 +283,12 @@ export default function SettingsScreen({
         />
       </View>
 
-      <View style={styles.card}>
-        <Text style={styles.settingLabel}>{t('settings.appearanceLabel')}</Text>
-        <SegmentedControl
-          styles={styles}
-          options={THEME_MODES}
-          value={themePreference}
-          onChange={setThemePreference}
-          t={t}
-        />
-      </View>
-
-      <View style={styles.card}>
-        <Text style={styles.settingLabel}>{t('settings.languageLabel')}</Text>
-        <SegmentedControl
-          styles={styles}
-          options={LANGUAGE_MODES}
-          value={locale}
-          onChange={setLocale}
-          t={t}
-          wrap
-        />
-      </View>
-
+      <SettingsSection
+        title={t('settings.sectionReminder')}
+        open={isOpen('reminder')}
+        onToggle={() => toggleSection('reminder')}
+        reduceMotion={reduceMotion}
+      >
       <View style={styles.card}>
         <Text style={styles.settingLabel}>{t('settings.alertModeLabel')}</Text>
         <SegmentedControl
@@ -301,6 +375,15 @@ export default function SettingsScreen({
                 );
               })}
             </View>
+            {workSchedule.days.length === 0 && (
+              <Text
+                style={styles.warningText}
+                accessibilityRole="alert"
+                accessibilityLiveRegion="polite"
+              >
+                {t('settings.workDaysEmptyWarning')}
+              </Text>
+            )}
             <Pressable
               onPress={() => onWorkScheduleChange({ ...workSchedule, days: WEEKDAYS_ONLY })}
               style={styles.quickButton}
@@ -336,6 +419,7 @@ export default function SettingsScreen({
             thumbColor={streakAlert.enabled ? colors.accent : colors.inputBg}
           />
         </View>
+        {notifDenied && <NotificationDeniedHint styles={styles} t={t} />}
         {streakAlert.enabled && (
           <View style={styles.steppersBlock}>
             <TimeStepper
@@ -361,24 +445,87 @@ export default function SettingsScreen({
             thumbColor={eyeRestEnabled ? colors.accent : colors.inputBg}
           />
         </View>
+        {notifDenied && <NotificationDeniedHint styles={styles} t={t} />}
       </View>
 
       <Pressable onPress={onTestNotification} style={styles.testButton}>
         <Text style={styles.testButtonText}>{t('settings.testButton')}</Text>
       </Pressable>
+      </SettingsSection>
 
-      <Pressable onPress={shareApp} style={styles.shareButton}>
-        <Text style={styles.shareButtonText}>{t('settings.shareButton')}</Text>
-      </Pressable>
-
-      <ShareCard />
-
-      <Pressable
-        onPress={() => Alert.alert(t('settings.privacyTitle'), t('settings.privacyText'))}
-        style={styles.linkRow}
+      <SettingsSection
+        title={t('settings.sectionAppearance')}
+        open={isOpen('appearance')}
+        onToggle={() => toggleSection('appearance')}
+        reduceMotion={reduceMotion}
       >
-        <Text style={styles.linkText}>{t('settings.privacyLink')}</Text>
-      </Pressable>
+        <View style={styles.card}>
+          <Text style={styles.settingLabel}>{t('settings.appearanceLabel')}</Text>
+          <SegmentedControl
+            styles={styles}
+            options={THEME_MODES}
+            value={themePreference}
+            onChange={setThemePreference}
+            t={t}
+          />
+        </View>
+
+        <View style={styles.card}>
+          <Text style={styles.settingLabel}>{t('settings.languageLabel')}</Text>
+          <SegmentedControl
+            styles={styles}
+            options={LANGUAGE_MODES}
+            value={locale}
+            onChange={setLocale}
+            t={t}
+            wrap
+          />
+        </View>
+      </SettingsSection>
+
+      <SettingsSection
+        title={t('settings.sectionShare')}
+        open={isOpen('share')}
+        onToggle={() => toggleSection('share')}
+        reduceMotion={reduceMotion}
+      >
+        <Pressable onPress={shareApp} style={styles.shareButton}>
+          <Text style={styles.shareButtonText}>{t('settings.shareButton')}</Text>
+        </Pressable>
+
+        <ShareCard />
+      </SettingsSection>
+
+      <SettingsSection
+        title={t('settings.sectionAbout')}
+        open={isOpen('about')}
+        onToggle={() => toggleSection('about')}
+        reduceMotion={reduceMotion}
+      >
+        <View style={styles.card}>
+          <View style={styles.cardRow}>
+            <Text style={styles.settingLabel}>{t('settings.versionLabel')}</Text>
+            <Text style={styles.stepperLabel}>{appConfig?.expo?.version ?? ''}</Text>
+          </View>
+        </View>
+
+        {privacyOptionsRequired && (
+          <Pressable
+            onPress={() => showPrivacyOptions()}
+            accessibilityRole="button"
+            style={styles.quickButtonWide}
+          >
+            <Text style={styles.quickButtonText}>{t('settings.adPrivacyOptions')}</Text>
+          </Pressable>
+        )}
+
+        <Pressable
+          onPress={() => Alert.alert(t('settings.privacyTitle'), t('settings.privacyText'))}
+          style={styles.linkRow}
+        >
+          <Text style={styles.linkText}>{t('settings.privacyLink')}</Text>
+        </Pressable>
+      </SettingsSection>
 
       <AdBanner />
     </ScrollView>
@@ -503,6 +650,27 @@ function createStyles(colors) {
       paddingHorizontal: 12,
       borderRadius: 8,
       backgroundColor: colors.accentSofter,
+    },
+    quickButtonWide: {
+      alignSelf: 'stretch',
+      alignItems: 'center',
+      paddingVertical: 12,
+      borderRadius: 12,
+      backgroundColor: colors.accentSofter,
+      marginBottom: 8,
+    },
+    warningText: {
+      fontSize: 13,
+      fontWeight: '600',
+      color: '#c0392b',
+    },
+    deniedBox: {
+      marginTop: 10,
+      gap: 8,
+    },
+    deniedText: {
+      fontSize: 12,
+      color: '#c0392b',
     },
     quickButtonText: {
       fontSize: 12,
