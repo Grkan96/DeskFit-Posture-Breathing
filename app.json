@@ -38,7 +38,9 @@
         "react-native-google-mobile-ads",
         {
           "androidAppId": "ca-app-pub-3272042685849939~2704849029",
-          "iosAppId": "ca-app-pub-3940256099942544~1458002511"
+          "iosAppId": "ca-app-pub-3940256099942544~1458002511",
+          "delayAppMeasurementInit": true,
+          "userTrackingUsageDescription": "Your device identifier is used to show you more relevant ads. You can decline and still use the app."
         }
       ],
       "expo-status-bar"
