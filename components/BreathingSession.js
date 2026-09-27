@@ -1,11 +1,53 @@
 import { useEffect, useRef, useState } from 'react';
 import { Animated, Pressable, StyleSheet, Text, View } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useAudioPlayer } from 'expo-audio';
 import { recordSessionCompleted } from '../lib/stats';
 import { celebrateIfMilestone } from '../lib/celebrateMilestone';
 import { useThemeColors } from '../lib/theme';
 import { useTranslation } from '../lib/i18n';
 import Confetti from './Confetti';
 import { CountdownRing, phaseColor, successHaptic, tapHaptic, useReduceMotion } from './SessionProgress';
+
+// --- Opsiyonel ortam sesi (yağmur / beyaz gürültü) --------------------------
+// Nefes seansı mantığına (faz zamanlaması, haptic, milestone, kayıt) dokunmayan,
+// tamamen izole, ekstra bir katman. Kullanıcı tercihi cihazda kalıcı olur ve
+// bir sonraki seansta hatırlanır.
+const AMBIENT_STORAGE_KEY = 'durus-hatirlatici/ambient-sound';
+const AMBIENT_CYCLE = ['off', 'rain', 'white'];
+const AMBIENT_ICON = { off: '🔈', rain: '🌧️', white: '📻' };
+const AMBIENT_LABEL_KEY = { off: 'ambientOff', rain: 'ambientRain', white: 'ambientWhiteNoise' };
+// require() ile statik yol vermek zorunlu (Metro dinamik string interpolasyonu çözemez).
+const AMBIENT_SOURCES = {
+  rain: require('../assets/sounds/rain.wav'),
+  white: require('../assets/sounds/white-noise.wav'),
+};
+
+// Kullanıcının ortam sesi tercihini AsyncStorage'da saklayıp okuyan, ve
+// Kapalı → Yağmur → Beyaz Gürültü → Kapalı döngüsünde ilerleten küçük hook.
+function useAmbientSoundPreference() {
+  const [ambientSound, setAmbientSound] = useState('off');
+
+  useEffect(() => {
+    AsyncStorage.getItem(AMBIENT_STORAGE_KEY)
+      .then((saved) => {
+        if (AMBIENT_CYCLE.includes(saved)) {
+          setAmbientSound(saved);
+        }
+      })
+      .catch(() => {});
+  }, []);
+
+  function cycleAmbientSound() {
+    setAmbientSound((prev) => {
+      const next = AMBIENT_CYCLE[(AMBIENT_CYCLE.indexOf(prev) + 1) % AMBIENT_CYCLE.length];
+      AsyncStorage.setItem(AMBIENT_STORAGE_KEY, next).catch(() => {});
+      return next;
+    });
+  }
+
+  return [ambientSound, cycleAmbientSound];
+}
 
 const REST_SCALE = 0.75;
 const CIRCLE = 170;
@@ -64,6 +106,35 @@ export default function BreathingSession({ technique, onBack, autoStart = false,
   const [session, setSession] = useState(() => initialSession(phases));
   const reduceMotion = useReduceMotion();
   const scaleAnim = useRef(new Animated.Value(REST_SCALE)).current;
+
+  // Ortam sesi: seçime göre kaynak değişir, useAudioPlayer yeni kaynak için
+  // otomatik olarak yeni bir AudioPlayer oluşturur ve eskisini serbest bırakır.
+  const [ambientSound, cycleAmbientSound] = useAmbientSoundPreference();
+  const ambientSource = ambientSound === 'off' ? null : AMBIENT_SOURCES[ambientSound];
+  const ambientPlayer = useAudioPlayer(ambientSource);
+
+  // Seans çalışırken ve bir ses seçiliyken döngülü çal; durunca/bitince/unmount
+  // olunca durdur. Ses oynatma hatası ana nefes akışını asla çökertmemeli.
+  useEffect(() => {
+    if (!ambientPlayer) return;
+    try {
+      ambientPlayer.loop = true;
+      if (running && ambientSound !== 'off') {
+        ambientPlayer.play();
+      } else {
+        ambientPlayer.pause();
+      }
+    } catch (e) {
+      // Sessiz başarısızlık: ortam sesi opsiyonel bir ek katman.
+    }
+    return () => {
+      try {
+        ambientPlayer.pause();
+      } catch (e) {
+        // no-op
+      }
+    };
+  }, [ambientPlayer, running, ambientSound]);
 
   // Her saniye tik atar; faz süresi dolunca bir sonraki faza (veya tura) geçer.
   useEffect(() => {
@@ -138,15 +209,27 @@ export default function BreathingSession({ technique, onBack, autoStart = false,
   return (
     <View style={styles.container}>
       <GradientBackdrop colors={colors} />
-      <Pressable
-        onPress={onBack}
-        style={styles.backButton}
-        hitSlop={8}
-        accessibilityRole="button"
-        accessibilityLabel={backLabel || t('breathing.backToTechniques')}
-      >
-        <Text style={styles.backText}>{backLabel || t('breathing.backToTechniques')}</Text>
-      </Pressable>
+      <View style={styles.headerRow}>
+        <Pressable
+          onPress={onBack}
+          style={styles.backButton}
+          hitSlop={8}
+          accessibilityRole="button"
+          accessibilityLabel={backLabel || t('breathing.backToTechniques')}
+        >
+          <Text style={styles.backText}>{backLabel || t('breathing.backToTechniques')}</Text>
+        </Pressable>
+
+        <Pressable
+          onPress={cycleAmbientSound}
+          style={styles.ambientButton}
+          hitSlop={8}
+          accessibilityRole="button"
+          accessibilityLabel={t(`breathing.${AMBIENT_LABEL_KEY[ambientSound]}`)}
+        >
+          <Text style={styles.ambientButtonIcon}>{AMBIENT_ICON[ambientSound]}</Text>
+        </Pressable>
+      </View>
 
       <Text style={styles.title} accessibilityRole="header">{title}</Text>
       <Text style={styles.subtitle}>
@@ -232,6 +315,12 @@ function createStyles(colors) {
       backgroundColor: colors.bg,
       overflow: 'hidden',
     },
+    headerRow: {
+      flexDirection: 'row',
+      alignSelf: 'stretch',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+    },
     backButton: {
       alignSelf: 'flex-start',
       minHeight: 48,
@@ -241,6 +330,19 @@ function createStyles(colors) {
       fontSize: 14,
       fontWeight: '600',
       color: colors.accent,
+    },
+    ambientButton: {
+      minWidth: 44,
+      minHeight: 44,
+      borderRadius: 22,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: colors.glassBg || colors.surface,
+      borderWidth: 1,
+      borderColor: colors.glassBorder || colors.border,
+    },
+    ambientButtonIcon: {
+      fontSize: 20,
     },
     title: {
       fontSize: 20,
