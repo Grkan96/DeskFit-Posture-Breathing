@@ -51,6 +51,24 @@
             "kotlinVersion": "2.3.0"
           }
         }
+      ],
+      [
+        "react-native-android-widget",
+        {
+          "widgets": [
+            {
+              "name": "StreakWidget",
+              "label": "Duruş Hatırlatıcı",
+              "description": "Bugünkü seri ve seans ilerlemeni gösterir.",
+              "minWidth": "180dp",
+              "minHeight": "110dp",
+              "targetCellWidth": 3,
+              "targetCellHeight": 2,
+              "resizeMode": "horizontal|vertical",
+              "updatePeriodMillis": 1800000
+            }
+          ]
+        }
       ]
     ],
     "extra": {
