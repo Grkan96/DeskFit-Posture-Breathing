@@ -268,7 +268,7 @@ export default function SettingsScreen({
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       <Text style={styles.header}>{t('settings.header')}</Text>
 
-      <View style={styles.card}>
+      <View style={styles.nameCard}>
         <Text style={styles.settingLabel}>{t('settings.nameLabel')}</Text>
         <TextInput
           value={nameText}
@@ -285,6 +285,7 @@ export default function SettingsScreen({
 
       <SettingsSection
         title={t('settings.sectionReminder')}
+        icon="🔔"
         open={isOpen('reminder')}
         onToggle={() => toggleSection('reminder')}
         reduceMotion={reduceMotion}
@@ -455,6 +456,7 @@ export default function SettingsScreen({
 
       <SettingsSection
         title={t('settings.sectionAppearance')}
+        icon="🎨"
         open={isOpen('appearance')}
         onToggle={() => toggleSection('appearance')}
         reduceMotion={reduceMotion}
@@ -485,6 +487,7 @@ export default function SettingsScreen({
 
       <SettingsSection
         title={t('settings.sectionShare')}
+        icon="💌"
         open={isOpen('share')}
         onToggle={() => toggleSection('share')}
         reduceMotion={reduceMotion}
@@ -498,6 +501,7 @@ export default function SettingsScreen({
 
       <SettingsSection
         title={t('settings.sectionAbout')}
+        icon="ℹ️"
         open={isOpen('about')}
         onToggle={() => toggleSection('about')}
         reduceMotion={reduceMotion}
@@ -543,22 +547,34 @@ function createStyles(colors) {
       paddingBottom: 24,
     },
     header: {
-      fontSize: 20,
-      fontWeight: '700',
+      fontSize: 22,
+      fontWeight: '800',
+      letterSpacing: -0.2,
       color: colors.text,
-      marginBottom: 14,
+      marginBottom: 18,
     },
-    card: {
+    nameCard: {
       backgroundColor: colors.surface,
-      borderRadius: 14,
+      borderRadius: 22,
+      borderWidth: 1,
+      borderColor: colors.glassBorder || colors.border,
+      paddingHorizontal: 18,
+      paddingVertical: 16,
+      marginBottom: 16,
+      elevation: 3,
+      shadowColor: colors.shadow,
+      shadowOpacity: 0.07,
+      shadowRadius: 14,
+      shadowOffset: { width: 0, height: 6 },
+    },
+    // Bölüm (SettingsSection) içindeki alt bento hücreleri: bölümün kendi
+    // gölgesi zaten var, burada sade/hafif kalıp yalnızca ayrım için ince
+    // bir kenarlık kullanılır; boşluk SettingsSection'ın `body` gap'inden gelir.
+    card: {
+      backgroundColor: colors.inputBg,
+      borderRadius: 16,
       paddingHorizontal: 16,
       paddingVertical: 14,
-      marginBottom: 12,
-      elevation: 2,
-      shadowColor: '#000',
-      shadowOpacity: 0.06,
-      shadowRadius: 6,
-      shadowOffset: { width: 0, height: 2 },
     },
     cardRow: {
       flexDirection: 'row',
@@ -602,9 +618,11 @@ function createStyles(colors) {
     },
     segment: {
       flex: 1,
+      minHeight: 44,
+      justifyContent: 'center',
       paddingVertical: 10,
-      borderRadius: 10,
-      backgroundColor: colors.inputBg,
+      borderRadius: 12,
+      backgroundColor: colors.surface,
       alignItems: 'center',
       gap: 2,
     },
@@ -639,23 +657,29 @@ function createStyles(colors) {
     },
     dayChip: {
       flex: 1,
+      minHeight: 44,
       paddingVertical: 8,
-      borderRadius: 8,
-      backgroundColor: colors.inputBg,
+      borderRadius: 12,
+      backgroundColor: colors.surface,
       alignItems: 'center',
+      justifyContent: 'center',
     },
     quickButton: {
       alignSelf: 'flex-start',
+      minHeight: 44,
       paddingVertical: 6,
-      paddingHorizontal: 12,
-      borderRadius: 8,
+      paddingHorizontal: 14,
+      borderRadius: 12,
       backgroundColor: colors.accentSofter,
+      justifyContent: 'center',
     },
     quickButtonWide: {
       alignSelf: 'stretch',
       alignItems: 'center',
+      justifyContent: 'center',
+      minHeight: 44,
       paddingVertical: 12,
-      borderRadius: 12,
+      borderRadius: 16,
       backgroundColor: colors.accentSofter,
       marginBottom: 8,
     },
@@ -692,10 +716,10 @@ function createStyles(colors) {
       gap: 10,
     },
     stepperButton: {
-      width: 30,
-      height: 30,
-      borderRadius: 8,
-      backgroundColor: colors.border,
+      width: 32,
+      height: 32,
+      borderRadius: 10,
+      backgroundColor: colors.surface,
       alignItems: 'center',
       justifyContent: 'center',
     },
@@ -712,10 +736,11 @@ function createStyles(colors) {
       textAlign: 'center',
     },
     testButton: {
-      marginTop: 8,
+      minHeight: 44,
+      justifyContent: 'center',
       paddingVertical: 12,
-      borderRadius: 12,
-      backgroundColor: colors.border,
+      borderRadius: 14,
+      backgroundColor: colors.inputBg,
       alignItems: 'center',
     },
     testButtonText: {
@@ -724,9 +749,10 @@ function createStyles(colors) {
       color: colors.subtext,
     },
     shareButton: {
-      marginTop: 10,
+      minHeight: 44,
+      justifyContent: 'center',
       paddingVertical: 12,
-      borderRadius: 12,
+      borderRadius: 14,
       backgroundColor: colors.accentSofter,
       alignItems: 'center',
     },
@@ -736,8 +762,9 @@ function createStyles(colors) {
       color: colors.accentText,
     },
     linkRow: {
-      marginTop: 16,
+      minHeight: 44,
       alignItems: 'center',
+      justifyContent: 'center',
       paddingVertical: 8,
     },
     linkText: {

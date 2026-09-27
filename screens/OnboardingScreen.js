@@ -114,8 +114,14 @@ export default function OnboardingScreen({ onFinish }) {
 
 function createStyles(colors) {
   return StyleSheet.create({
+    // Yumuşak ipucu bandı: kartın içinde ayrı bir bento hücresi gibi durur.
     hint: {
-      marginTop: 16,
+      marginTop: 18,
+      alignSelf: 'stretch',
+      backgroundColor: colors.inputBg,
+      borderRadius: 14,
+      paddingHorizontal: 16,
+      paddingVertical: 12,
       fontSize: 14,
       lineHeight: 20,
       color: colors.muted,
