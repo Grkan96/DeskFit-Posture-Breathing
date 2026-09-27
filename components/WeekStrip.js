@@ -1,4 +1,5 @@
 import { StyleSheet, Text, View } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 
 // Son 7 gün: her gün için bir nokta (yapıldıysa dolu) + gün harfi. `days` =
 // lib/stats.js getLast7Days çıktısı; `labels` = 0 (Pazar)..6 kısa gün adları.
@@ -13,15 +14,18 @@ export default function WeekStrip({ days, labels, colors, todayLabel, doneLabel,
         const a11y = `${name}${isToday ? `, ${todayLabel}` : ''}: ${done ? doneLabel : missedLabel}`;
         return (
           <View key={d.date} style={styles.cell} accessible accessibilityLabel={a11y}>
-            <View
-              style={[
-                styles.dot,
-                done && styles.dotDone,
-                isToday && !done && styles.dotToday,
-              ]}
-            >
-              {done ? <Text style={styles.check}>✓</Text> : null}
-            </View>
+            {done ? (
+              <LinearGradient
+                colors={[colors.gradientFrom, colors.gradientTo]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={[styles.dot, styles.dotDone]}
+              >
+                <Text style={styles.check}>✓</Text>
+              </LinearGradient>
+            ) : (
+              <View style={[styles.dot, isToday && styles.dotToday]} />
+            )}
             <Text style={[styles.label, isToday && styles.labelToday]} numberOfLines={1}>
               {name}
             </Text>
@@ -47,31 +51,36 @@ function createStyles(colors) {
       gap: 4,
     },
     dot: {
-      width: 26,
-      height: 26,
-      borderRadius: 13,
+      width: 28,
+      height: 28,
+      borderRadius: 14,
       alignItems: 'center',
       justifyContent: 'center',
-      backgroundColor: colors.inputBg,
+      backgroundColor: colors.glassBg,
       borderWidth: 1.5,
-      borderColor: colors.border,
+      borderColor: colors.glassBorder,
     },
     dotDone: {
-      backgroundColor: colors.accent,
-      borderColor: colors.accent,
+      borderWidth: 0,
+      shadowColor: colors.accent,
+      shadowOpacity: 0.3,
+      shadowRadius: 6,
+      shadowOffset: { width: 0, height: 2 },
+      elevation: 2,
     },
     dotToday: {
       borderColor: colors.accent,
+      borderWidth: 2,
     },
     check: {
       fontSize: 13,
       fontWeight: '800',
-      color: colors.onAccent,
+      color: colors.text,
     },
     label: {
       fontSize: 11,
       fontWeight: '600',
-      color: colors.muted,
+      color: colors.subtext,
     },
     labelToday: {
       color: colors.accentText,

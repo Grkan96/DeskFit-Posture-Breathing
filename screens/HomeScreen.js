@@ -18,6 +18,7 @@ import TimeSlider from '../components/TimeSlider';
 import ProgressRing from '../components/ProgressRing';
 import WeekStrip from '../components/WeekStrip';
 import QuickBreak from '../components/QuickBreak';
+import GradientCard from '../components/GradientCard';
 import { getStats, getLast7Days } from '../lib/stats';
 import {
   DAILY_GOAL,
@@ -25,7 +26,7 @@ import {
   remainingFromTarget,
   countdownProgress,
 } from '../lib/homeProgress';
-import { useThemeColors } from '../lib/theme';
+import { useThemeColors, radius } from '../lib/theme';
 import { useTranslation } from '../lib/i18n';
 
 const INTERVALS = [15, 30, 45, 60];
@@ -191,13 +192,58 @@ export default function HomeScreen({
       keyboardShouldPersistTaps="handled"
       showsVerticalScrollIndicator={false}
     >
-      <View style={styles.statsCard}>
+      <View style={styles.header}>
+        <Text style={styles.greeting} accessibilityRole="header">
+          {t('home.greeting', { name: userName })}
+        </Text>
+        <Text style={styles.subtitle}>
+          {isRunning
+            ? t('home.statusActive', { minutes: intervalMinutes }) +
+              (quietHoursEnabled
+                ? t('home.quietSuffix', { start: formatHour(quietStart), end: formatHour(quietEnd) })
+                : '')
+            : t('home.statusInactive')}
+        </Text>
+        {todayReminderCount > 0 && (
+          <View style={styles.countPill}>
+            <Text style={styles.countPillText}>
+              {t('home.reminderCount', { count: todayReminderCount })}
+            </Text>
+          </View>
+        )}
+      </View>
+
+      {/* Bento hero card: today's streak, posture ring and week strip together
+          on the soft sage-green -> sky-blue gradient with a glass panel. */}
+      <GradientCard style={styles.heroCard} contentStyle={styles.heroContent}>
         <Text
           style={styles.streakText}
           accessibilityLabel={streak > 0 ? t('home.streakA11y', { count: streak }) : t('home.streakNone')}
         >
           {streak > 0 ? t('home.streakLabel', { count: streak }) : t('home.streakNone')}
         </Text>
+
+        <View style={styles.ringWrap}>
+          <Text style={styles.ringTitle}>{t('home.ringTitle')}</Text>
+          <ProgressRing
+            count={todayCount}
+            goal={DAILY_GOAL}
+            color={colors.accent}
+            trackColor={colors.glassBorder}
+            textColor={colors.text}
+            subColor={colors.subtext}
+            subLabel={t('home.ringSub', { goal: DAILY_GOAL })}
+            reduceMotion={reduceMotion}
+            celebrateKey={celebrateKey}
+            accessibilityLabel={t('home.ringA11y', { count: todayCount, goal: DAILY_GOAL })}
+          />
+          <Text style={[styles.ringCaption, goalReached && styles.ringCaptionDone]}>
+            {goalReached
+              ? t('home.ringDone')
+              : t('home.ringRemaining', { left: DAILY_GOAL - todayCount })}
+          </Text>
+        </View>
+
         <WeekStrip
           days={days}
           labels={weekLabels}
@@ -206,145 +252,127 @@ export default function HomeScreen({
           doneLabel={t('home.weekDone')}
           missedLabel={t('home.weekMissed')}
         />
-      </View>
+      </GradientCard>
 
-      <Text style={styles.greeting} accessibilityRole="header">
-        {t('home.greeting', { name: userName })}
-      </Text>
-      <Text style={styles.subtitle}>
-        {isRunning
-          ? t('home.statusActive', { minutes: intervalMinutes }) +
-            (quietHoursEnabled
-              ? t('home.quietSuffix', { start: formatHour(quietStart), end: formatHour(quietEnd) })
-              : '')
-          : t('home.statusInactive')}
-      </Text>
-      {todayReminderCount > 0 && (
-        <View style={styles.countPill}>
-          <Text style={styles.countPillText}>
-            {t('home.reminderCount', { count: todayReminderCount })}
-          </Text>
-        </View>
-      )}
-
-      <View style={styles.ringWrap}>
-        <Text style={styles.ringTitle}>{t('home.ringTitle')}</Text>
-        <ProgressRing
-          count={todayCount}
-          goal={DAILY_GOAL}
-          color={colors.accent}
-          trackColor={colors.inputBg}
-          textColor={colors.text}
-          subColor={colors.muted}
-          subLabel={t('home.ringSub', { goal: DAILY_GOAL })}
-          reduceMotion={reduceMotion}
-          celebrateKey={celebrateKey}
-          accessibilityLabel={t('home.ringA11y', { count: todayCount, goal: DAILY_GOAL })}
-        />
-        <Text style={[styles.ringCaption, goalReached && styles.ringCaptionDone]}>
-          {goalReached
-            ? t('home.ringDone')
-            : t('home.ringRemaining', { left: DAILY_GOAL - todayCount })}
-        </Text>
-      </View>
-
-      <View style={styles.buttonWrap}>
-        {isRunning && !reduceMotion && (
-          <Animated.View
-            pointerEvents="none"
-            style={[styles.ring, { backgroundColor: ringColor }, ringStyle]}
-          />
-        )}
-        <Pressable
-          onPress={handleMainPress}
-          accessibilityRole="button"
-          accessibilityLabel={isRunning ? t('home.stop') : t('home.start')}
-          accessibilityHint={isRunning ? t('home.stopHint') : t('home.startHint')}
-          style={({ pressed }) => [
-            styles.mainButton,
-            isRunning ? styles.mainButtonStop : styles.mainButtonStart,
-            pressed && styles.mainButtonPressed,
-          ]}
-        >
-          <Text style={[styles.mainButtonText, isRunning && styles.mainButtonTextStop]}>
-            {isRunning ? t('home.stop') : t('home.start')}
-          </Text>
-        </Pressable>
-      </View>
-
-      <Pressable
-        onPress={() => {
-          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
-          setBreakOpen(true);
-        }}
-        accessibilityRole="button"
-        accessibilityLabel={t('home.breakNow')}
-        accessibilityHint={t('home.breakNowHint')}
-        style={({ pressed }) => [styles.breakButton, pressed && styles.chipPressed]}
+      {/* Action card: START/STOP plus the live countdown while running. */}
+      <GradientCard
+        variant="soft"
+        style={styles.actionCard}
+        contentStyle={styles.actionCardContent}
       >
-        <Text style={styles.breakButtonText}>{t('home.breakNow')}</Text>
-      </Pressable>
-
-      {isRunning && (
-        <View
-          style={styles.countdownCard}
-          accessible
-          accessibilityLabel={`${t('home.nextReminderLabel')}: ${formatCountdown(remaining)}`}
-        >
-          <Text style={styles.countdownLabel}>
-            {t('home.nextIn', { time: '' }).trim()}
-          </Text>
-          <Text style={styles.countdownValue}>{formatCountdown(remaining)}</Text>
-          <View style={styles.progressTrack}>
-            <View style={[styles.progressFill, { width: `${Math.round(progress * 100)}%` }]} />
-          </View>
+        <View style={styles.buttonWrap}>
+          {isRunning && !reduceMotion && (
+            <Animated.View
+              pointerEvents="none"
+              style={[styles.ring, { backgroundColor: ringColor }, ringStyle]}
+            />
+          )}
+          <Pressable
+            onPress={handleMainPress}
+            accessibilityRole="button"
+            accessibilityLabel={isRunning ? t('home.stop') : t('home.start')}
+            accessibilityHint={isRunning ? t('home.stopHint') : t('home.startHint')}
+            style={({ pressed }) => [
+              styles.mainButton,
+              isRunning ? styles.mainButtonStop : styles.mainButtonStart,
+              pressed && styles.mainButtonPressed,
+            ]}
+          >
+            <Text style={[styles.mainButtonText, isRunning && styles.mainButtonTextStop]}>
+              {isRunning ? t('home.stop') : t('home.start')}
+            </Text>
+          </Pressable>
         </View>
-      )}
 
-      <Text style={styles.sectionLabel}>{t('home.intervalSectionLabel')}</Text>
-      <View style={styles.intervalRow}>
-        {INTERVALS.map((minutes) => {
-          const selected = minutes === intervalMinutes;
-          return (
-            <Pressable
-              key={minutes}
-              onPress={() => {
-                Haptics.selectionAsync().catch(() => {});
-                onIntervalCommit(minutes);
-              }}
-              accessibilityRole="button"
-              accessibilityState={{ selected }}
-              accessibilityLabel={t('home.minutesLabel', { minutes })}
-              style={({ pressed }) => [
-                styles.chip,
-                selected && styles.chipSelected,
-                pressed && styles.chipPressed,
-              ]}
-            >
-              <Text style={[styles.chipValue, selected && styles.chipValueSelected]}>
-                {minutes}
-              </Text>
-              <Text style={[styles.chipUnit, selected && styles.chipUnitSelected]}>
-                {t('home.minuteUnit')}
-              </Text>
-            </Pressable>
-          );
-        })}
-        <TextInput
-          value={customText}
-          onChangeText={(txt) => setCustomText(txt.replace(/[^0-9]/g, ''))}
-          onSubmitEditing={commitCustom}
-          onBlur={() => customText && commitCustom()}
-          placeholder={t('home.customPlaceholder')}
-          placeholderTextColor={colors.faint}
-          keyboardType="number-pad"
-          returnKeyType="done"
-          accessibilityLabel={t('home.customInputLabel')}
-          style={styles.customChip}
-        />
-      </View>
+        {isRunning && (
+          <View
+            style={styles.countdownWrap}
+            accessible
+            accessibilityLabel={`${t('home.nextReminderLabel')}: ${formatCountdown(remaining)}`}
+          >
+            <Text style={styles.countdownLabel}>
+              {t('home.nextIn', { time: '' }).trim()}
+            </Text>
+            <Text style={styles.countdownValue}>{formatCountdown(remaining)}</Text>
+            <View style={styles.progressTrack}>
+              <View style={[styles.progressFill, { width: `${Math.round(progress * 100)}%` }]} />
+            </View>
+          </View>
+        )}
+      </GradientCard>
 
-      <TimeSlider minutes={intervalMinutes} onChange={onIntervalCommit} />
+      {/* Break card, its own bento tile. */}
+      <GradientCard
+        variant="soft"
+        style={styles.breakCard}
+        contentStyle={styles.breakCardContent}
+        cornerRadius={radius.lg}
+      >
+        <Pressable
+          onPress={() => {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
+            setBreakOpen(true);
+          }}
+          accessibilityRole="button"
+          accessibilityLabel={t('home.breakNow')}
+          accessibilityHint={t('home.breakNowHint')}
+          style={({ pressed }) => [styles.breakButton, pressed && styles.chipPressed]}
+        >
+          <Text style={styles.breakButtonText}>{t('home.breakNow')}</Text>
+        </Pressable>
+      </GradientCard>
+
+      <GradientCard
+        variant="soft"
+        style={styles.intervalCard}
+        contentStyle={styles.intervalCardContent}
+        cornerRadius={radius.lg}
+      >
+        <Text style={styles.sectionLabel}>{t('home.intervalSectionLabel')}</Text>
+        <View style={styles.intervalRow}>
+          {INTERVALS.map((minutes) => {
+            const selected = minutes === intervalMinutes;
+            return (
+              <Pressable
+                key={minutes}
+                onPress={() => {
+                  Haptics.selectionAsync().catch(() => {});
+                  onIntervalCommit(minutes);
+                }}
+                accessibilityRole="button"
+                accessibilityState={{ selected }}
+                accessibilityLabel={t('home.minutesLabel', { minutes })}
+                style={({ pressed }) => [
+                  styles.chip,
+                  selected && styles.chipSelected,
+                  pressed && styles.chipPressed,
+                ]}
+              >
+                <Text style={[styles.chipValue, selected && styles.chipValueSelected]}>
+                  {minutes}
+                </Text>
+                <Text style={[styles.chipUnit, selected && styles.chipUnitSelected]}>
+                  {t('home.minuteUnit')}
+                </Text>
+              </Pressable>
+            );
+          })}
+          <TextInput
+            value={customText}
+            onChangeText={(txt) => setCustomText(txt.replace(/[^0-9]/g, ''))}
+            onSubmitEditing={commitCustom}
+            onBlur={() => customText && commitCustom()}
+            placeholder={t('home.customPlaceholder')}
+            placeholderTextColor={colors.faint}
+            keyboardType="number-pad"
+            returnKeyType="done"
+            accessibilityLabel={t('home.customInputLabel')}
+            style={styles.customChip}
+          />
+        </View>
+
+        <TimeSlider minutes={intervalMinutes} onChange={onIntervalCommit} />
+      </GradientCard>
 
       <Modal
         visible={breakOpen}
@@ -372,82 +400,31 @@ function createStyles(colors) {
       flex: 1,
     },
     container: {
+      alignItems: 'stretch',
+      paddingHorizontal: 20,
+      paddingTop: 20,
+      paddingBottom: 32,
+      gap: 16,
+    },
+    header: {
       alignItems: 'center',
-      paddingHorizontal: 24,
-      paddingTop: 16,
-      paddingBottom: 24,
-    },
-    statsCard: {
-      alignSelf: 'stretch',
-      alignItems: 'center',
-      backgroundColor: colors.surface,
-      borderRadius: 20,
-      borderWidth: 1,
-      borderColor: colors.border,
-      paddingVertical: 14,
-      paddingHorizontal: 12,
-      marginBottom: 18,
-    },
-    streakText: {
-      fontSize: 16,
-      fontWeight: '800',
-      color: colors.text,
-    },
-    ringWrap: {
-      alignItems: 'center',
-      marginTop: 22,
-    },
-    ringTitle: {
-      fontSize: 12,
-      fontWeight: '700',
-      color: colors.muted,
-      textTransform: 'uppercase',
-      letterSpacing: 1,
-      marginBottom: 10,
-    },
-    ringCaption: {
-      marginTop: 10,
-      fontSize: 13,
-      fontWeight: '600',
-      color: colors.subtext,
-      textAlign: 'center',
-    },
-    ringCaptionDone: {
-      color: colors.accentText,
-      fontWeight: '800',
-    },
-    breakButton: {
-      minHeight: 48,
-      paddingVertical: 12,
-      paddingHorizontal: 24,
-      borderRadius: 999,
-      backgroundColor: colors.accentSofter,
-      borderWidth: 1.5,
-      borderColor: colors.accent,
-      alignItems: 'center',
-      justifyContent: 'center',
-      marginBottom: 24,
-    },
-    breakButtonText: {
-      fontSize: 16,
-      fontWeight: '800',
-      color: colors.accentText,
+      gap: 6,
     },
     greeting: {
-      fontSize: 26,
+      fontSize: 28,
       fontWeight: '800',
-      letterSpacing: -0.3,
+      letterSpacing: -0.4,
       color: colors.text,
+      textAlign: 'center',
     },
     subtitle: {
-      marginTop: 6,
-      fontSize: 14,
-      lineHeight: 20,
+      fontSize: 15,
+      lineHeight: 21,
       color: colors.subtext,
       textAlign: 'center',
     },
     countPill: {
-      marginTop: 10,
+      marginTop: 4,
       paddingVertical: 6,
       paddingHorizontal: 12,
       borderRadius: 999,
@@ -458,9 +435,65 @@ function createStyles(colors) {
       fontWeight: '700',
       color: colors.accentText,
     },
+    // Hero bento card (gradient + glass).
+    heroCard: {},
+    heroContent: {
+      alignItems: 'center',
+      paddingVertical: 20,
+      paddingHorizontal: 16,
+      gap: 4,
+    },
+    streakText: {
+      fontSize: 17,
+      fontWeight: '800',
+      letterSpacing: -0.2,
+      color: colors.text,
+    },
+    ringWrap: {
+      alignItems: 'center',
+      marginTop: 18,
+      marginBottom: 18,
+    },
+    ringTitle: {
+      fontSize: 12,
+      fontWeight: '700',
+      color: colors.subtext,
+      textTransform: 'uppercase',
+      letterSpacing: 1.2,
+      marginBottom: 12,
+    },
+    ringCaption: {
+      marginTop: 12,
+      fontSize: 13,
+      fontWeight: '600',
+      color: colors.subtext,
+      textAlign: 'center',
+    },
+    ringCaptionDone: {
+      color: colors.accentText,
+      fontWeight: '800',
+    },
+    // Action bento card: START/STOP + countdown.
+    actionCard: {},
+    actionCardContent: {
+      alignItems: 'center',
+      paddingVertical: 20,
+      paddingHorizontal: 16,
+    },
+    breakCard: {},
+    breakCardContent: {
+      alignItems: 'center',
+      paddingVertical: 16,
+      paddingHorizontal: 16,
+    },
+    intervalCard: {},
+    intervalCardContent: {
+      alignItems: 'center',
+      paddingVertical: 18,
+      paddingHorizontal: 16,
+    },
     buttonWrap: {
-      marginTop: 28,
-      marginBottom: 28,
+      alignSelf: 'center',
       width: BUTTON_SIZE,
       height: BUTTON_SIZE,
       alignItems: 'center',
@@ -503,26 +536,18 @@ function createStyles(colors) {
     mainButtonTextStop: {
       color: colors.onDanger,
     },
-    countdownCard: {
+    countdownWrap: {
       alignSelf: 'stretch',
       alignItems: 'center',
-      backgroundColor: colors.surface,
-      borderRadius: 20,
-      paddingVertical: 16,
-      paddingHorizontal: 20,
-      marginBottom: 24,
-      borderWidth: 1,
-      borderColor: colors.border,
-      elevation: 2,
-      shadowColor: colors.shadow,
-      shadowOpacity: 0.08,
-      shadowRadius: 10,
-      shadowOffset: { width: 0, height: 4 },
+      marginTop: 20,
+      paddingTop: 16,
+      borderTopWidth: 1,
+      borderTopColor: colors.border,
     },
     countdownLabel: {
       fontSize: 13,
       fontWeight: '600',
-      color: colors.muted,
+      color: colors.subtext,
     },
     countdownValue: {
       marginTop: 2,
@@ -544,21 +569,37 @@ function createStyles(colors) {
       borderRadius: 3,
       backgroundColor: colors.accent,
     },
+    breakButton: {
+      minHeight: 48,
+      paddingVertical: 12,
+      paddingHorizontal: 24,
+      borderRadius: 999,
+      backgroundColor: colors.accentSofter,
+      borderWidth: 1.5,
+      borderColor: colors.accent,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    breakButtonText: {
+      fontSize: 16,
+      fontWeight: '800',
+      color: colors.accentText,
+    },
     sectionLabel: {
       alignSelf: 'flex-start',
       fontSize: 12,
       fontWeight: '700',
-      color: colors.muted,
-      marginBottom: 10,
+      color: colors.subtext,
+      marginBottom: 12,
       textTransform: 'uppercase',
-      letterSpacing: 1,
+      letterSpacing: 1.2,
     },
     intervalRow: {
       flexDirection: 'row',
       flexWrap: 'wrap',
       justifyContent: 'center',
       gap: 10,
-      marginBottom: 20,
+      marginBottom: 16,
     },
     chip: {
       flexDirection: 'row',
