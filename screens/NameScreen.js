@@ -112,9 +112,9 @@ function createStyles(colors) {
   return StyleSheet.create({
     container: { flex: 1, backgroundColor: colors.bg },
     input: {
-      marginTop: 28,
+      marginTop: 24,
       alignSelf: 'stretch',
-      backgroundColor: colors.surface,
+      backgroundColor: colors.inputBg,
       borderRadius: 16,
       borderWidth: 1.5,
       borderColor: colors.borderStrong,
@@ -123,11 +123,6 @@ function createStyles(colors) {
       paddingVertical: 14,
       fontSize: 17,
       color: colors.text,
-      elevation: 2,
-      shadowColor: colors.shadow,
-      shadowOpacity: 0.06,
-      shadowRadius: 6,
-      shadowOffset: { width: 0, height: 2 },
     },
   });
 }
