@@ -24,6 +24,7 @@ import { refreshStreakAlerts } from './lib/streakAlert';
 import { DEFAULT_WORK_SCHEDULE, DEFAULT_STREAK_ALERT } from './lib/schedule';
 import { initializeAds } from './lib/ads';
 import { getTodayReminderCount, incrementTodayReminderCount } from './lib/reminderLog';
+import { updateWidgetContext } from './lib/widgetUpdate';
 import { useThemeColors } from './lib/theme';
 import NameScreen from './screens/NameScreen';
 import OnboardingScreen from './screens/OnboardingScreen';
@@ -111,7 +112,12 @@ export default function App() {
   };
 
   async function refreshNextReminder() {
-    setNextReminderAt(await getNextPostureReminderAt());
+    const at = await getNextPostureReminderAt();
+    setNextReminderAt(at);
+    // Widget'ı güncel çalışma durumu/aralık/bir sonraki hatırlatıcı ile besle
+    // (bkz. lib/widgetUpdate.js — Expo Go'da veya widget yoksa sessizce yok sayılır).
+    updateWidgetContext({ isRunning, intervalMinutes, nextReminderAt: at });
+    return at;
   }
 
   // Kuyrukları bugünden itibaren yeniden doldurur (iOS 64 sınırı ve sonlu
@@ -384,7 +390,7 @@ export default function App() {
 
   async function reschedulePosture(settings) {
     await scheduleReminder(settings);
-    await refreshNextReminder();
+    return refreshNextReminder();
   }
 
   async function refreshEyeRest(overrides = {}) {
@@ -416,13 +422,20 @@ export default function App() {
       await AsyncStorage.removeItem(RUNNING_KEY).catch(() => {});
       setIsRunning(false);
       setNextReminderAt(null);
+      // isRunning state güncellemesi bu render'da henüz yansımadığı için widget'ı
+      // burada açıkça (doğru, güncel değerlerle) besliyoruz.
+      updateWidgetContext({ isRunning: false, intervalMinutes, nextReminderAt: null });
       return;
     }
     const ok = await requestPermission();
     if (!ok) return;
     await AsyncStorage.setItem(RUNNING_KEY, 'true').catch(() => {});
     setIsRunning(true);
-    await reschedulePosture(currentSettings());
+    const at = await reschedulePosture(currentSettings());
+    // Aynı sebeple: reschedulePosture->refreshNextReminder içindeki widget
+    // güncellemesi bu geçişte hâlâ eski isRunning'i görebilir; burada doğru
+    // (running: true) değerle son sözü söylüyoruz.
+    updateWidgetContext({ isRunning: true, intervalMinutes, nextReminderAt: at });
     // İzin yeni verildiyse seri uyarısı da şimdi planlanabilir.
     refreshStreakAlerts({ streakAlert });
   }
