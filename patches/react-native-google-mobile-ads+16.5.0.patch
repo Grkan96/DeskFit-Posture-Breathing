@@ -1,0 +1,13 @@
+diff --git a/node_modules/react-native-google-mobile-ads/package.json b/node_modules/react-native-google-mobile-ads/package.json
+index 0000000..0000000 100644
+--- a/node_modules/react-native-google-mobile-ads/package.json
++++ b/node_modules/react-native-google-mobile-ads/package.json
+@@ -51,7 +51,7 @@
+       "targetSdk": 34,
+       "compileSdk": 34,
+       "buildTools": "34.0.0",
+-      "googleMobileAds": "25.4.0",
++      "googleMobileAds": "23.6.0",
+       "googleUmp": "4.0.0"
+     }
+   },
