@@ -1,6 +1,15 @@
 import { useEffect, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { getStats, getLast7Days, startPostureChallenge, todayKey } from '../lib/stats';
+import {
+  getStats,
+  getLast7Days,
+  startPostureChallenge,
+  todayKey,
+  getRestDayInfo,
+  getRestDayInfoFromStats,
+  markRestDay,
+  unmarkRestDay,
+} from '../lib/stats';
 import { useThemeColors, radius } from '../lib/theme';
 import { useTranslation } from '../lib/i18n';
 import { shareAchievement, shareBadge, shareChallenge } from '../lib/sharing';
@@ -47,9 +56,11 @@ export default function StatsScreen() {
   const { t } = useTranslation();
   const weekdayLabels = t('stats.weekdays');
   const [stats, setStats] = useState(null);
+  const [restInfo, setRestInfo] = useState(null);
 
   useEffect(() => {
     getStats().then(setStats);
+    getRestDayInfo().then(setRestInfo);
   }, []);
 
   if (!stats) {
@@ -63,6 +74,20 @@ export default function StatsScreen() {
 
   function handleStartChallenge() {
     startPostureChallenge().then(setStats);
+  }
+
+  const today = todayKey();
+  const hasSessionToday = (stats.history[today] || 0) > 0;
+  const isTodayRestDay = !!stats.restDays[today];
+  const restRemaining = restInfo ? restInfo.remaining : 0;
+
+  function handleToggleRestDay() {
+    const action = isTodayRestDay ? unmarkRestDay : markRestDay;
+    action(today).then((res) => {
+      if (!res.ok) return;
+      setStats(res.stats);
+      setRestInfo(getRestDayInfoFromStats(res.stats));
+    });
   }
 
   const week = getLast7Days(stats.history);
@@ -171,6 +196,26 @@ export default function StatsScreen() {
           </Pressable>
         )}
       </GradientCard>
+
+      <Text style={[styles.sectionLabel, styles.sectionSpaced]}>{t('stats.restDaySectionLabel')}</Text>
+      <View style={styles.restDayCard}>
+        <Text style={styles.restDayHint}>{t('stats.restDayHint')}</Text>
+        <Text style={styles.restDayRemaining}>
+          {restRemaining === 0
+            ? t('stats.restDayRemainingNone')
+            : restRemaining === 1
+            ? t('stats.restDayRemainingOne')
+            : t('stats.restDayRemaining', { count: restRemaining })}
+        </Text>
+        {isTodayRestDay && <Text style={styles.restDayMarkedText}>{t('stats.restDayMarkedToday')}</Text>}
+        {!hasSessionToday && (isTodayRestDay || restRemaining > 0) && (
+          <Pressable onPress={handleToggleRestDay} style={styles.restDayButton}>
+            <Text style={styles.restDayButtonText}>
+              {isTodayRestDay ? t('stats.restDayUnmarkButton') : t('stats.restDayMarkButton')}
+            </Text>
+          </Pressable>
+        )}
+      </View>
 
       <Text style={[styles.sectionLabel, styles.sectionSpaced]}>
         {t('achievements.sectionLabel')} · {t('achievements.progress', { unlocked: unlockedCount, total: ACHIEVEMENTS.length })}
@@ -404,6 +449,45 @@ function createStyles(colors) {
       alignItems: 'center',
     },
     challengeButtonText: {
+      fontSize: 14,
+      fontWeight: '700',
+      color: colors.accentText,
+    },
+    restDayCard: {
+      backgroundColor: colors.surface,
+      borderRadius: 16,
+      padding: 16,
+      elevation: 2,
+      shadowColor: '#000',
+      shadowOpacity: 0.06,
+      shadowRadius: 6,
+      shadowOffset: { width: 0, height: 2 },
+    },
+    restDayHint: {
+      fontSize: 13,
+      color: colors.subtext,
+      lineHeight: 19,
+    },
+    restDayRemaining: {
+      marginTop: 8,
+      fontSize: 14,
+      fontWeight: '700',
+      color: colors.accentText,
+    },
+    restDayMarkedText: {
+      marginTop: 8,
+      fontSize: 12,
+      fontWeight: '600',
+      color: colors.muted,
+    },
+    restDayButton: {
+      marginTop: 14,
+      paddingVertical: 12,
+      borderRadius: 12,
+      backgroundColor: colors.accentSofter,
+      alignItems: 'center',
+    },
+    restDayButtonText: {
       fontSize: 14,
       fontWeight: '700',
       color: colors.accentText,
