@@ -18,6 +18,7 @@ import TimeSlider from '../components/TimeSlider';
 import ProgressRing from '../components/ProgressRing';
 import WeekStrip from '../components/WeekStrip';
 import QuickBreak from '../components/QuickBreak';
+import Companion from '../components/Companion';
 import { getStats, getLast7Days } from '../lib/stats';
 import {
   DAILY_GOAL,
@@ -362,6 +363,13 @@ export default function HomeScreen({
           {breakOpen && <QuickBreak onBack={closeBreak} />}
         </View>
       </Modal>
+
+      {/* Küçük duruş dostu maskot — seriye ve halka doluluğuna göre ruh hali gösterir. */}
+      <Companion
+        streak={streak}
+        ringFraction={DAILY_GOAL > 0 ? Math.min(1, Math.max(0, todayCount / DAILY_GOAL)) : 0}
+        style={{ marginTop: 8, marginBottom: 12 }}
+      />
     </ScrollView>
   );
 }
