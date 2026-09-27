@@ -14,12 +14,12 @@ import {
 } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import TimeSlider from '../components/TimeSlider';
 import ProgressRing from '../components/ProgressRing';
 import WeekStrip from '../components/WeekStrip';
 import QuickBreak from '../components/QuickBreak';
 import Companion from '../components/Companion';
 import GradientCard from '../components/GradientCard';
+import AdBanner from '../components/AdBanner';
 import { getStats, getLast7Days } from '../lib/stats';
 import {
   DAILY_GOAL,
@@ -33,7 +33,7 @@ import { useTranslation } from '../lib/i18n';
 const INTERVALS = [15, 30, 45, 60];
 const MIN_MINUTES = 1;
 const MAX_CUSTOM_MINUTES = 600;
-const BUTTON_SIZE = 152;
+const BUTTON_SIZE = 124;
 
 function formatHour(hour) {
   return `${String(hour).padStart(2, '0')}:00`;
@@ -187,12 +187,13 @@ export default function HomeScreen({
   const goalReached = todayCount >= DAILY_GOAL;
 
   return (
-    <ScrollView
-      style={styles.scroll}
-      contentContainerStyle={styles.container}
-      keyboardShouldPersistTaps="handled"
-      showsVerticalScrollIndicator={false}
-    >
+    <View style={styles.screen}>
+      <ScrollView
+        style={styles.scroll}
+        contentContainerStyle={styles.container}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
+      >
       <View style={styles.header}>
         <Text style={styles.greeting} accessibilityRole="header">
           {t('home.greeting', { name: userName })}
@@ -371,8 +372,6 @@ export default function HomeScreen({
             style={styles.customChip}
           />
         </View>
-
-        <TimeSlider minutes={intervalMinutes} onChange={onIntervalCommit} />
       </GradientCard>
 
       <Modal
@@ -396,38 +395,43 @@ export default function HomeScreen({
       <Companion
         streak={streak}
         ringFraction={DAILY_GOAL > 0 ? Math.min(1, Math.max(0, todayCount / DAILY_GOAL)) : 0}
-        style={{ marginTop: 8, marginBottom: 12 }}
+        style={{ marginTop: 4, marginBottom: 4 }}
       />
-    </ScrollView>
+      </ScrollView>
+      <AdBanner />
+    </View>
   );
 }
 
 function createStyles(colors) {
   return StyleSheet.create({
+    screen: {
+      flex: 1,
+    },
     scroll: {
       flex: 1,
     },
     container: {
       alignItems: 'stretch',
       paddingHorizontal: 20,
-      paddingTop: 20,
-      paddingBottom: 32,
-      gap: 16,
+      paddingTop: 12,
+      paddingBottom: 12,
+      gap: 10,
     },
     header: {
       alignItems: 'center',
-      gap: 6,
+      gap: 3,
     },
     greeting: {
-      fontSize: 28,
+      fontSize: 24,
       fontWeight: '800',
       letterSpacing: -0.4,
       color: colors.text,
       textAlign: 'center',
     },
     subtitle: {
-      fontSize: 15,
-      lineHeight: 21,
+      fontSize: 14,
+      lineHeight: 19,
       color: colors.subtext,
       textAlign: 'center',
     },
@@ -447,32 +451,32 @@ function createStyles(colors) {
     heroCard: {},
     heroContent: {
       alignItems: 'center',
-      paddingVertical: 20,
+      paddingVertical: 14,
       paddingHorizontal: 16,
-      gap: 4,
+      gap: 2,
     },
     streakText: {
-      fontSize: 17,
+      fontSize: 16,
       fontWeight: '800',
       letterSpacing: -0.2,
       color: colors.text,
     },
     ringWrap: {
       alignItems: 'center',
-      marginTop: 18,
-      marginBottom: 18,
+      marginTop: 8,
+      marginBottom: 8,
     },
     ringTitle: {
-      fontSize: 12,
+      fontSize: 11,
       fontWeight: '700',
       color: colors.subtext,
       textTransform: 'uppercase',
       letterSpacing: 1.2,
-      marginBottom: 12,
+      marginBottom: 8,
     },
     ringCaption: {
-      marginTop: 12,
-      fontSize: 13,
+      marginTop: 8,
+      fontSize: 12,
       fontWeight: '600',
       color: colors.subtext,
       textAlign: 'center',
@@ -485,19 +489,19 @@ function createStyles(colors) {
     actionCard: {},
     actionCardContent: {
       alignItems: 'center',
-      paddingVertical: 20,
+      paddingVertical: 14,
       paddingHorizontal: 16,
     },
     breakCard: {},
     breakCardContent: {
       alignItems: 'center',
-      paddingVertical: 16,
+      paddingVertical: 10,
       paddingHorizontal: 16,
     },
     intervalCard: {},
     intervalCardContent: {
       alignItems: 'center',
-      paddingVertical: 18,
+      paddingVertical: 12,
       paddingHorizontal: 16,
     },
     buttonWrap: {
@@ -537,7 +541,7 @@ function createStyles(colors) {
     },
     mainButtonText: {
       color: colors.onAccent,
-      fontSize: 22,
+      fontSize: 19,
       fontWeight: '800',
       letterSpacing: 1.5,
     },
@@ -547,19 +551,19 @@ function createStyles(colors) {
     countdownWrap: {
       alignSelf: 'stretch',
       alignItems: 'center',
-      marginTop: 20,
-      paddingTop: 16,
+      marginTop: 12,
+      paddingTop: 10,
       borderTopWidth: 1,
       borderTopColor: colors.border,
     },
     countdownLabel: {
-      fontSize: 13,
+      fontSize: 12,
       fontWeight: '600',
       color: colors.subtext,
     },
     countdownValue: {
       marginTop: 2,
-      fontSize: 38,
+      fontSize: 30,
       fontWeight: '800',
       color: colors.text,
       fontVariant: ['tabular-nums'],
@@ -567,7 +571,7 @@ function createStyles(colors) {
     progressTrack: {
       alignSelf: 'stretch',
       height: 6,
-      marginTop: 10,
+      marginTop: 8,
       borderRadius: 3,
       overflow: 'hidden',
       backgroundColor: colors.inputBg,
@@ -598,7 +602,7 @@ function createStyles(colors) {
       fontSize: 12,
       fontWeight: '700',
       color: colors.subtext,
-      marginBottom: 12,
+      marginBottom: 10,
       textTransform: 'uppercase',
       letterSpacing: 1.2,
     },
@@ -607,7 +611,6 @@ function createStyles(colors) {
       flexWrap: 'wrap',
       justifyContent: 'center',
       gap: 10,
-      marginBottom: 16,
     },
     chip: {
       flexDirection: 'row',

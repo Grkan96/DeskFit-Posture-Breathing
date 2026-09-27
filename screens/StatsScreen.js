@@ -16,6 +16,7 @@ import { shareAchievement, shareBadge, shareChallenge } from '../lib/sharing';
 import { ACHIEVEMENTS } from '../lib/achievements';
 import { CHALLENGE_DAYS } from '../lib/challenge';
 import GradientCard from '../components/GradientCard';
+import AdBanner from '../components/AdBanner';
 
 const BAR_MAX_HEIGHT = 90;
 
@@ -256,6 +257,8 @@ export default function StatsScreen() {
           <Text style={styles.shareButtonText}>{t('stats.shareButton')}</Text>
         </Pressable>
       )}
+
+      <AdBanner />
     </ScrollView>
   );
 }
