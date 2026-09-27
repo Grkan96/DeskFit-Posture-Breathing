@@ -4,7 +4,8 @@ import { useThemeColors } from '../lib/theme';
 import { useReduceMotion } from './SessionProgress';
 
 const COUNT = 34;
-const PALETTE = ['#facc15', '#22c55e', '#38bdf8', '#f472b6', '#fb923c', '#a78bfa'];
+// 2026 wellness paleti: doygun neonlar yerine sakin, pastel tonlar.
+const PALETTE = ['#fde68a', '#86efac', '#93c5fd', '#f9a8d4', '#fdba9a', '#c4b5fd'];
 
 // Tamamlanma kutlaması: yukarıdan süzülen konfeti + parıltı. Hareketi azalt
 // açıksa hiçbir şey çizmez (sade son ekran çağıran tarafta kalır).

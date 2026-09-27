@@ -19,11 +19,51 @@ const CATEGORIES = [
   { id: 'breathing', icon: '🌬️', ready: true },
 ];
 
+const RADIUS_XL = 26;
+const RADIUS_LG = 20;
+
+// 2026 wellness estetiği: ekranın arkasına, bağımlılık eklemeden düşük
+// opaklıklı büyük dairelerle yumuşak bir gradient dokusu verir.
+function GradientBackdrop({ colors }) {
+  const from = colors.gradientFrom || colors.accentSofter;
+  const to = colors.gradientTo || colors.accentSoft;
+  return (
+    <View pointerEvents="none" style={StyleSheet.absoluteFillObject}>
+      <View style={[backdropStyles.blobTop, { backgroundColor: from }]} />
+      <View style={[backdropStyles.blobBottom, { backgroundColor: to }]} />
+    </View>
+  );
+}
+
+const backdropStyles = StyleSheet.create({
+  blobTop: {
+    position: 'absolute',
+    top: -60,
+    right: -90,
+    width: 280,
+    height: 280,
+    borderRadius: 140,
+    opacity: 0.28,
+  },
+  blobBottom: {
+    position: 'absolute',
+    top: 260,
+    left: -110,
+    width: 320,
+    height: 320,
+    borderRadius: 160,
+    opacity: 0.18,
+  },
+});
+
+// Geniş "hero" bento kartı: hızlı mola ve günün önerisi için.
 function CategoryCard({ styles, icon, title, description, ready, badgeLabel, onPress }) {
   return (
     <Pressable
       style={({ pressed }) => [styles.card, pressed && styles.cardPressed]}
       onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel={`${title}. ${description}`}
     >
       <Text style={styles.cardIcon}>{icon}</Text>
       <View style={styles.cardBody}>
@@ -31,6 +71,27 @@ function CategoryCard({ styles, icon, title, description, ready, badgeLabel, onP
         <Text style={styles.cardDescription}>{description}</Text>
       </View>
       <View style={[styles.badge, ready && styles.badgeReady]}>
+        <Text style={[styles.badgeText, ready && styles.badgeTextReady]}>{badgeLabel}</Text>
+      </View>
+    </Pressable>
+  );
+}
+
+// Kare bento karo: hareketler/egzersizler/nefes kategori ızgarası için.
+function GridTile({ styles, icon, title, description, ready, badgeLabel, onPress }) {
+  return (
+    <Pressable
+      style={({ pressed }) => [styles.gridTile, pressed && styles.cardPressed]}
+      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel={`${title}. ${description}`}
+    >
+      <Text style={styles.gridTileIcon}>{icon}</Text>
+      <Text style={styles.gridTileTitle}>{title}</Text>
+      <Text style={styles.gridTileDescription} numberOfLines={2}>
+        {description}
+      </Text>
+      <View style={[styles.badge, ready && styles.badgeReady, styles.gridTileBadge]}>
         <Text style={[styles.badgeText, ready && styles.badgeTextReady]}>{badgeLabel}</Text>
       </View>
     </Pressable>
@@ -89,101 +150,111 @@ export default function MeditationScreen({ onChangeTab }) {
   }
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      <Text style={styles.emoji}>🌿</Text>
-      <Text style={styles.header}>{t('meditation.header')}</Text>
-      <Text style={styles.subtitle}>{t('meditation.subtitle')}</Text>
+    <View style={styles.screen}>
+      <GradientBackdrop colors={colors} />
+      <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+        <Text style={styles.emoji}>🌿</Text>
+        <Text style={styles.header}>{t('meditation.header')}</Text>
+        <Text style={styles.subtitle}>{t('meditation.subtitle')}</Text>
 
-      {stats && stats.totalSessions > 0 && (
-        <Pressable
-          style={({ pressed }) => [styles.statsRow, pressed && styles.cardPressed]}
-          onPress={() => onChangeTab && onChangeTab('stats')}
-          accessibilityRole="button"
-          accessibilityLabel={`${t('meditation.statsStreak')} ${stats.streak}, ${t('meditation.statsSessions')} ${stats.totalSessions}. ${t('stats.seeStats')}`}
-        >
-          <View style={styles.statBadge}>
-            <Text style={styles.statValue}>🔥 {stats.streak}</Text>
-            <Text style={styles.statLabel}>{t('meditation.statsStreak')}</Text>
-          </View>
-          <View style={styles.statBadge}>
-            <Text style={styles.statValue}>✅ {stats.totalSessions}</Text>
-            <Text style={styles.statLabel}>{t('meditation.statsSessions')}</Text>
-          </View>
-        </Pressable>
-      )}
+        {stats && stats.totalSessions > 0 && (
+          <Pressable
+            style={({ pressed }) => [styles.statsRow, pressed && styles.cardPressed]}
+            onPress={() => onChangeTab && onChangeTab('stats')}
+            accessibilityRole="button"
+            accessibilityLabel={`${t('meditation.statsStreak')} ${stats.streak}, ${t('meditation.statsSessions')} ${stats.totalSessions}. ${t('stats.seeStats')}`}
+          >
+            <View style={styles.statBadge}>
+              <Text style={styles.statValue}>🔥 {stats.streak}</Text>
+              <Text style={styles.statLabel}>{t('meditation.statsStreak')}</Text>
+            </View>
+            <View style={styles.statBadge}>
+              <Text style={styles.statValue}>✅ {stats.totalSessions}</Text>
+              <Text style={styles.statLabel}>{t('meditation.statsSessions')}</Text>
+            </View>
+          </Pressable>
+        )}
 
-      {challenge && (
-        <View style={styles.challengeCard}>
-          <Text style={styles.challengeTitle}>{t('challenge.sectionLabel')}</Text>
-          {challenge.active || challenge.completed ? (
-            <Pressable onPress={() => onChangeTab && onChangeTab('stats')} hitSlop={6} accessibilityRole="button">
-              <Text style={styles.challengeBody}>
-                {challenge.completed
-                  ? t('challenge.completedLabel')
-                  : `${t('challenge.progress', { done: challenge.doneDates.length, total: CHALLENGE_DAYS })} · ${t('challenge.todayGoal')}`}
-              </Text>
-            </Pressable>
-          ) : (
-            <>
-              <Text style={styles.challengeBody}>{t('challenge.intro')}</Text>
-              <Pressable onPress={handleStartChallenge} style={styles.challengeButton}>
-                <Text style={styles.challengeButtonText}>{t('challenge.startButton')}</Text>
+        {challenge && (
+          <View style={styles.challengeCard}>
+            <Text style={styles.challengeTitle}>{t('challenge.sectionLabel')}</Text>
+            {challenge.active || challenge.completed ? (
+              <Pressable onPress={() => onChangeTab && onChangeTab('stats')} hitSlop={6} accessibilityRole="button">
+                <Text style={styles.challengeBody}>
+                  {challenge.completed
+                    ? t('challenge.completedLabel')
+                    : `${t('challenge.progress', { done: challenge.doneDates.length, total: CHALLENGE_DAYS })} · ${t('challenge.todayGoal')}`}
+                </Text>
               </Pressable>
-            </>
-          )}
+            ) : (
+              <>
+                <Text style={styles.challengeBody}>{t('challenge.intro')}</Text>
+                <Pressable onPress={handleStartChallenge} style={styles.challengeButton}>
+                  <Text style={styles.challengeButtonText}>{t('challenge.startButton')}</Text>
+                </Pressable>
+              </>
+            )}
+          </View>
+        )}
+
+        <View style={styles.heroList}>
+          <CategoryCard
+            styles={styles}
+            icon="⚡"
+            ready
+            title={t('meditation.quickBreakTitle')}
+            description={t('meditation.quickBreakDescription')}
+            badgeLabel={t('meditation.badgeReady')}
+            onPress={() => setActiveSession('quick')}
+          />
+          <CategoryCard
+            styles={styles}
+            icon="🎯"
+            ready
+            title={t('meditation.suggestionTitle')}
+            description={t('meditation.suggestionBody', {
+              name: t(`meditation.categories.${suggestion.type}.title`),
+            })}
+            badgeLabel={t('meditation.badgeReady')}
+            onPress={() => setActiveSession(`suggest-${suggestion.type}`)}
+          />
         </View>
-      )}
 
-      <View style={styles.cardList}>
-        <CategoryCard
-          styles={styles}
-          icon="⚡"
-          ready
-          title={t('meditation.quickBreakTitle')}
-          description={t('meditation.quickBreakDescription')}
-          badgeLabel={t('meditation.badgeReady')}
-          onPress={() => setActiveSession('quick')}
-        />
-        <CategoryCard
-          styles={styles}
-          icon="🎯"
-          ready
-          title={t('meditation.suggestionTitle')}
-          description={t('meditation.suggestionBody', {
-            name: t(`meditation.categories.${suggestion.type}.title`),
+        <View style={styles.grid}>
+          {CATEGORIES.map((category) => {
+            const title = t(`meditation.categories.${category.id}.title`);
+            const description = t(`meditation.categories.${category.id}.description`);
+            return (
+              <GridTile
+                key={category.id}
+                styles={styles}
+                icon={category.icon}
+                ready={category.ready}
+                title={title}
+                description={description}
+                badgeLabel={category.ready ? t('meditation.badgeReady') : t('meditation.badgeSoon')}
+                onPress={() =>
+                  category.ready
+                    ? setActiveSession(category.id)
+                    : Alert.alert(title, t('meditation.comingSoonBody'))
+                }
+              />
+            );
           })}
-          badgeLabel={t('meditation.badgeReady')}
-          onPress={() => setActiveSession(`suggest-${suggestion.type}`)}
-        />
-        {CATEGORIES.map((category) => {
-          const title = t(`meditation.categories.${category.id}.title`);
-          const description = t(`meditation.categories.${category.id}.description`);
-          return (
-            <CategoryCard
-              key={category.id}
-              styles={styles}
-              icon={category.icon}
-              ready={category.ready}
-              title={title}
-              description={description}
-              badgeLabel={category.ready ? t('meditation.badgeReady') : t('meditation.badgeSoon')}
-              onPress={() =>
-                category.ready
-                  ? setActiveSession(category.id)
-                  : Alert.alert(title, t('meditation.comingSoonBody'))
-              }
-            />
-          );
-        })}
-      </View>
+        </View>
 
-      <AdBanner />
-    </ScrollView>
+        <AdBanner />
+      </ScrollView>
+    </View>
   );
 }
 
 function createStyles(colors) {
   return StyleSheet.create({
+    screen: {
+      flex: 1,
+      backgroundColor: colors.bg,
+    },
     container: {
       flex: 1,
     },
@@ -210,22 +281,26 @@ function createStyles(colors) {
       lineHeight: 19,
     },
     statsRow: {
+      alignSelf: 'stretch',
       flexDirection: 'row',
       gap: 10,
       marginTop: 16,
       marginBottom: 4,
     },
     statBadge: {
-      backgroundColor: colors.surface,
-      borderRadius: 14,
+      flex: 1,
+      backgroundColor: colors.glassBg || colors.surface,
+      borderRadius: RADIUS_LG,
+      borderWidth: 1,
+      borderColor: colors.glassBorder || colors.border,
       paddingHorizontal: 16,
-      paddingVertical: 10,
+      paddingVertical: 12,
       alignItems: 'center',
       elevation: 1,
-      shadowColor: '#000',
-      shadowOpacity: 0.05,
-      shadowRadius: 4,
-      shadowOffset: { width: 0, height: 1 },
+      shadowColor: colors.shadow,
+      shadowOpacity: 0.06,
+      shadowRadius: 8,
+      shadowOffset: { width: 0, height: 2 },
     },
     statValue: {
       fontSize: 16,
@@ -241,9 +316,16 @@ function createStyles(colors) {
     challengeCard: {
       alignSelf: 'stretch',
       backgroundColor: colors.accentSofter,
-      borderRadius: 16,
-      padding: 16,
+      borderRadius: RADIUS_LG,
+      borderWidth: 1,
+      borderColor: colors.glassBorder || colors.border,
+      padding: 18,
       marginTop: 16,
+      elevation: 1,
+      shadowColor: colors.shadow,
+      shadowOpacity: 0.06,
+      shadowRadius: 8,
+      shadowOffset: { width: 0, height: 2 },
     },
     challengeTitle: {
       fontSize: 14,
@@ -269,7 +351,7 @@ function createStyles(colors) {
       fontSize: 13,
       fontWeight: '700',
     },
-    cardList: {
+    heroList: {
       alignSelf: 'stretch',
       gap: 12,
       marginTop: 20,
@@ -277,15 +359,17 @@ function createStyles(colors) {
     card: {
       flexDirection: 'row',
       alignItems: 'center',
-      backgroundColor: colors.surface,
-      borderRadius: 16,
+      backgroundColor: colors.glassBg || colors.surface,
+      borderRadius: RADIUS_LG,
+      borderWidth: 1,
+      borderColor: colors.glassBorder || colors.border,
       paddingHorizontal: 16,
       paddingVertical: 16,
       elevation: 2,
-      shadowColor: '#000',
-      shadowOpacity: 0.06,
-      shadowRadius: 6,
-      shadowOffset: { width: 0, height: 2 },
+      shadowColor: colors.shadow,
+      shadowOpacity: 0.08,
+      shadowRadius: 10,
+      shadowOffset: { width: 0, height: 3 },
     },
     cardPressed: {
       opacity: 0.8,
@@ -307,6 +391,53 @@ function createStyles(colors) {
       fontSize: 12,
       color: colors.muted,
       lineHeight: 17,
+    },
+    // Hareketler/egzersizler/nefes için 2 sütunlu bento ızgara.
+    grid: {
+      alignSelf: 'stretch',
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: 12,
+      marginTop: 12,
+    },
+    gridTile: {
+      flexBasis: '47%',
+      flexGrow: 1,
+      minHeight: 132,
+      backgroundColor: colors.glassBg || colors.surface,
+      borderRadius: RADIUS_LG,
+      borderWidth: 1,
+      borderColor: colors.glassBorder || colors.border,
+      paddingHorizontal: 14,
+      paddingVertical: 16,
+      alignItems: 'center',
+      justifyContent: 'center',
+      elevation: 2,
+      shadowColor: colors.shadow,
+      shadowOpacity: 0.08,
+      shadowRadius: 10,
+      shadowOffset: { width: 0, height: 3 },
+    },
+    gridTileIcon: {
+      fontSize: 26,
+      marginBottom: 6,
+    },
+    gridTileTitle: {
+      fontSize: 14,
+      fontWeight: '700',
+      color: colors.text,
+      textAlign: 'center',
+    },
+    gridTileDescription: {
+      marginTop: 3,
+      fontSize: 11,
+      color: colors.muted,
+      textAlign: 'center',
+      lineHeight: 15,
+    },
+    gridTileBadge: {
+      marginLeft: 0,
+      marginTop: 8,
     },
     badge: {
       backgroundColor: colors.border,

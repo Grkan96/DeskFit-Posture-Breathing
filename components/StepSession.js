@@ -7,6 +7,44 @@ import { useTranslation } from '../lib/i18n';
 import Confetti from './Confetti';
 import { CountdownRing, StepDots, StepProgressBar, successHaptic, tapHaptic, useReduceMotion } from './SessionProgress';
 
+const RADIUS_XL = 26;
+const RADIUS_PILL = 20;
+
+// 2026 wellness estetiği: aynı yumuşak blob-gradient dokusu BreathingSession
+// ile paylaşılır (bağımlılık eklemeden, düşük opaklıklı büyük dairelerle).
+// `tint` verilirse (MovementsScreen/ExercisesScreen) o türe özgü ton kullanılır.
+function GradientBackdrop({ colors, tint }) {
+  const from = tint?.from || colors.gradientFrom || colors.accentSofter;
+  const to = tint?.to || colors.gradientTo || colors.accentSoft;
+  return (
+    <View pointerEvents="none" style={StyleSheet.absoluteFillObject}>
+      <View style={[backdropStyles.blobTop, { backgroundColor: from }]} />
+      <View style={[backdropStyles.blobBottom, { backgroundColor: to }]} />
+    </View>
+  );
+}
+
+const backdropStyles = StyleSheet.create({
+  blobTop: {
+    position: 'absolute',
+    top: -80,
+    left: -70,
+    width: 280,
+    height: 280,
+    borderRadius: 140,
+    opacity: 0.3,
+  },
+  blobBottom: {
+    position: 'absolute',
+    bottom: -100,
+    right: -80,
+    width: 320,
+    height: 320,
+    borderRadius: 160,
+    opacity: 0.22,
+  },
+});
+
 function initialSession(steps) {
   return { stepIndex: 0, secondsLeft: steps[0].seconds, done: false };
 }
@@ -14,7 +52,7 @@ function initialSession(steps) {
 // Sırayla ilerleyen, her adımı bir süre boyunca gösteren genel amaçlı seans
 // bileşeni. Nefes dersleri hariç (o özel bir faz/tur döngüsü kullanıyor),
 // hareketler ve egzersizler bunu paylaşır.
-export default function StepSession({ title, subtitle, steps, onBack, idleIcon = '🧘', type, autoStart = false }) {
+export default function StepSession({ title, subtitle, steps, onBack, idleIcon = '🧘', type, tint, autoStart = false }) {
   const colors = useThemeColors();
   const styles = createStyles(colors);
   const { t } = useTranslation();
@@ -92,6 +130,7 @@ export default function StepSession({ title, subtitle, steps, onBack, idleIcon =
 
   return (
     <View style={styles.container}>
+      <GradientBackdrop colors={colors} tint={tint} />
       <Pressable
         onPress={onBack}
         style={styles.backButton}
@@ -214,6 +253,8 @@ function createStyles(colors) {
       alignItems: 'center',
       paddingHorizontal: 24,
       paddingTop: 16,
+      backgroundColor: colors.bg,
+      overflow: 'hidden',
     },
     backButton: {
       alignSelf: 'flex-start',
@@ -260,16 +301,18 @@ function createStyles(colors) {
     },
     card: {
       alignSelf: 'stretch',
-      backgroundColor: colors.surface,
-      borderRadius: 20,
+      backgroundColor: colors.glassBg || colors.surface,
+      borderRadius: RADIUS_XL,
+      borderWidth: 1,
+      borderColor: colors.glassBorder || colors.border,
       paddingHorizontal: 24,
       paddingVertical: 28,
       alignItems: 'center',
       elevation: 3,
       shadowColor: colors.shadow,
-      shadowOpacity: 0.08,
-      shadowRadius: 8,
-      shadowOffset: { width: 0, height: 3 },
+      shadowOpacity: 0.1,
+      shadowRadius: 16,
+      shadowOffset: { width: 0, height: 6 },
     },
     cardIcon: {
       fontSize: 40,
@@ -308,11 +351,16 @@ function createStyles(colors) {
     },
     actionButton: {
       alignSelf: 'stretch',
-      borderRadius: 14,
+      borderRadius: RADIUS_PILL,
       minHeight: 52,
       justifyContent: 'center',
       alignItems: 'center',
       marginBottom: 24,
+      elevation: 1,
+      shadowColor: colors.shadow,
+      shadowOpacity: 0.12,
+      shadowRadius: 10,
+      shadowOffset: { width: 0, height: 4 },
     },
     actionButtonStart: {
       backgroundColor: colors.accent,
