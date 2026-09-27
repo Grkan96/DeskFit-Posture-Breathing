@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { getStats, getLast7Days, startPostureChallenge, todayKey } from '../lib/stats';
-import { useThemeColors } from '../lib/theme';
+import { useThemeColors, radius } from '../lib/theme';
 import { useTranslation } from '../lib/i18n';
 import { shareAchievement, shareBadge, shareChallenge } from '../lib/sharing';
 import { ACHIEVEMENTS } from '../lib/achievements';
 import { CHALLENGE_DAYS } from '../lib/challenge';
+import GradientCard from '../components/GradientCard';
 
 const BAR_MAX_HEIGHT = 90;
 
@@ -72,26 +73,33 @@ export default function StatsScreen() {
       <Text style={styles.header} accessibilityRole="header">{t('stats.header')}</Text>
 
       {stats.totalSessions === 0 && (
-        <View style={styles.emptyCard} accessible accessibilityLabel={`${t('stats.emptyTitle')}. ${t('stats.emptyBody')}`}>
-          <Text style={styles.emptyEmoji}>🌱</Text>
-          <Text style={styles.emptyTitle}>{t('stats.emptyTitle')}</Text>
-          <Text style={styles.emptyBody}>{t('stats.emptyBody')}</Text>
-        </View>
+        <GradientCard
+          variant="soft"
+          style={styles.emptyCard}
+          contentStyle={styles.emptyCardContent}
+        >
+          <View accessible accessibilityLabel={`${t('stats.emptyTitle')}. ${t('stats.emptyBody')}`}>
+            <Text style={styles.emptyEmoji}>🌱</Text>
+            <Text style={styles.emptyTitle}>{t('stats.emptyTitle')}</Text>
+            <Text style={styles.emptyBody}>{t('stats.emptyBody')}</Text>
+          </View>
+        </GradientCard>
       )}
 
+      {/* Streak + total-sessions bento tiles, same card language as Home. */}
       <View style={styles.summaryRow}>
-        <View style={styles.summaryCard}>
+        <GradientCard variant="soft" style={styles.summaryCard} contentStyle={styles.summaryCardContent}>
           <Text style={styles.summaryValue}>🔥 {stats.streak}</Text>
           <Text style={styles.summaryLabel}>{t('stats.streakLabel')}</Text>
-        </View>
-        <View style={styles.summaryCard}>
+        </GradientCard>
+        <GradientCard variant="soft" style={styles.summaryCard} contentStyle={styles.summaryCardContent}>
           <Text style={styles.summaryValue}>✅ {stats.totalSessions}</Text>
           <Text style={styles.summaryLabel}>{t('stats.sessionsLabel')}</Text>
-        </View>
+        </GradientCard>
       </View>
 
       <Text style={styles.sectionLabel}>{t('stats.weekSectionLabel')}</Text>
-      <View style={styles.chartCard}>
+      <GradientCard variant="soft" style={styles.chartCard} contentStyle={styles.chartCardContent}>
         <View style={styles.chartRow}>
           {week.map((day) => {
             const height = day.count === 0 ? 4 : Math.max(10, (day.count / maxCount) * BAR_MAX_HEIGHT);
@@ -115,7 +123,7 @@ export default function StatsScreen() {
             );
           })}
         </View>
-      </View>
+      </GradientCard>
 
       <Text style={styles.sectionLabel}>{t('stats.typeSectionLabel')}</Text>
       <View style={styles.typeList}>
@@ -129,7 +137,7 @@ export default function StatsScreen() {
       </View>
 
       <Text style={[styles.sectionLabel, styles.sectionSpaced]}>{t('challenge.sectionLabel')}</Text>
-      <View style={styles.challengeCard}>
+      <GradientCard style={styles.challengeCard} contentStyle={styles.challengeCardContent}>
         {challenge.active || challenge.completed ? (
           <>
             <View style={styles.challengeHeaderRow}>
@@ -162,7 +170,7 @@ export default function StatsScreen() {
             </Text>
           </Pressable>
         )}
-      </View>
+      </GradientCard>
 
       <Text style={[styles.sectionLabel, styles.sectionSpaced]}>
         {t('achievements.sectionLabel')} · {t('achievements.progress', { unlocked: unlockedCount, total: ACHIEVEMENTS.length })}
@@ -213,47 +221,40 @@ function createStyles(colors) {
       flex: 1,
     },
     content: {
-      paddingHorizontal: 24,
-      paddingTop: 24,
+      paddingHorizontal: 20,
+      paddingTop: 20,
       paddingBottom: 32,
+      gap: 16,
     },
-    emptyCard: {
-      backgroundColor: colors.accentSofter,
-      borderRadius: 16,
-      padding: 20,
+    emptyCard: {},
+    emptyCardContent: {
       alignItems: 'center',
-      marginBottom: 24,
+      paddingVertical: 20,
+      paddingHorizontal: 16,
     },
     emptyEmoji: { fontSize: 40, marginBottom: 6 },
     emptyTitle: { fontSize: 16, fontWeight: '800', color: colors.accentText, textAlign: 'center' },
     emptyBody: { marginTop: 4, fontSize: 13, color: colors.text, textAlign: 'center', lineHeight: 19 },
     badgeHint: { marginTop: 6, fontSize: 11, fontWeight: '700', color: colors.accentText, textAlign: 'center' },
     header: {
-      fontSize: 20,
-      fontWeight: '700',
+      fontSize: 24,
+      fontWeight: '800',
+      letterSpacing: -0.3,
       color: colors.text,
-      marginTop: 8,
-      marginBottom: 16,
     },
     summaryRow: {
       flexDirection: 'row',
       gap: 12,
-      marginBottom: 24,
     },
     summaryCard: {
       flex: 1,
-      backgroundColor: colors.surface,
-      borderRadius: 16,
-      paddingVertical: 16,
+    },
+    summaryCardContent: {
+      paddingVertical: 18,
       alignItems: 'center',
-      elevation: 2,
-      shadowColor: '#000',
-      shadowOpacity: 0.06,
-      shadowRadius: 6,
-      shadowOffset: { width: 0, height: 2 },
     },
     summaryValue: {
-      fontSize: 20,
+      fontSize: 22,
       fontWeight: '800',
       color: colors.text,
     },
@@ -262,27 +263,23 @@ function createStyles(colors) {
       fontSize: 11,
       fontWeight: '600',
       color: colors.faint,
+      textTransform: 'uppercase',
+      letterSpacing: 0.6,
     },
     sectionLabel: {
+      alignSelf: 'flex-start',
       fontSize: 12,
-      fontWeight: '600',
-      color: colors.muted,
-      marginBottom: 10,
+      fontWeight: '700',
+      color: colors.subtext,
+      marginBottom: -4,
       textTransform: 'uppercase',
-      letterSpacing: 1,
+      letterSpacing: 1.2,
     },
-    chartCard: {
-      backgroundColor: colors.surface,
-      borderRadius: 16,
+    chartCard: {},
+    chartCardContent: {
       paddingHorizontal: 12,
       paddingTop: 20,
       paddingBottom: 12,
-      marginBottom: 24,
-      elevation: 2,
-      shadowColor: '#000',
-      shadowOpacity: 0.06,
-      shadowRadius: 6,
-      shadowOffset: { width: 0, height: 2 },
     },
     chartRow: {
       flexDirection: 'row',
@@ -328,11 +325,13 @@ function createStyles(colors) {
       flexDirection: 'row',
       alignItems: 'center',
       backgroundColor: colors.surface,
-      borderRadius: 14,
+      borderRadius: radius.md,
+      borderWidth: 1,
+      borderColor: colors.border,
       paddingHorizontal: 16,
       paddingVertical: 14,
       elevation: 1,
-      shadowColor: '#000',
+      shadowColor: colors.shadow,
       shadowOpacity: 0.05,
       shadowRadius: 4,
       shadowOffset: { width: 0, height: 1 },
@@ -352,18 +351,11 @@ function createStyles(colors) {
       fontWeight: '800',
       color: colors.accent,
     },
-    sectionSpaced: {
-      marginTop: 24,
-    },
-    challengeCard: {
-      backgroundColor: colors.surface,
-      borderRadius: 16,
-      padding: 16,
-      elevation: 2,
-      shadowColor: '#000',
-      shadowOpacity: 0.06,
-      shadowRadius: 6,
-      shadowOffset: { width: 0, height: 2 },
+    sectionSpaced: {},
+    challengeCard: {},
+    challengeCardContent: {
+      paddingVertical: 16,
+      paddingHorizontal: 16,
     },
     challengeHeaderRow: {
       flexDirection: 'row',
@@ -391,7 +383,7 @@ function createStyles(colors) {
       marginTop: 10,
       fontSize: 12,
       fontWeight: '600',
-      color: colors.muted,
+      color: colors.subtext,
     },
     progressTrack: {
       height: 10,
@@ -407,7 +399,7 @@ function createStyles(colors) {
     challengeButton: {
       marginTop: 14,
       paddingVertical: 12,
-      borderRadius: 12,
+      borderRadius: radius.md,
       backgroundColor: colors.accentSofter,
       alignItems: 'center',
     },
@@ -425,12 +417,14 @@ function createStyles(colors) {
     badgeCard: {
       width: '48%',
       backgroundColor: colors.surface,
-      borderRadius: 14,
+      borderRadius: radius.md,
+      borderWidth: 1,
+      borderColor: colors.border,
       paddingVertical: 14,
       paddingHorizontal: 10,
       alignItems: 'center',
       elevation: 1,
-      shadowColor: '#000',
+      shadowColor: colors.shadow,
       shadowOpacity: 0.05,
       shadowRadius: 4,
       shadowOffset: { width: 0, height: 1 },
@@ -458,9 +452,9 @@ function createStyles(colors) {
       textAlign: 'center',
     },
     shareButton: {
-      marginTop: 20,
+      marginTop: 4,
       paddingVertical: 14,
-      borderRadius: 14,
+      borderRadius: radius.lg,
       backgroundColor: colors.accent,
       alignItems: 'center',
     },

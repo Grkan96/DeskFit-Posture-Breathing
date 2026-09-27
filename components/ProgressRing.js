@@ -73,7 +73,16 @@ export default function ProgressRing({
       accessibilityRole="progressbar"
       accessibilityLabel={accessibilityLabel}
       accessibilityValue={{ min: 0, max: goal, now: Math.min(count, goal) }}
-      style={{ width: size, height: size, transform: [{ scale: bounce }] }}
+      style={{
+        width: size,
+        height: size,
+        transform: [{ scale: bounce }],
+        shadowColor: color,
+        shadowOpacity: 0.28,
+        shadowRadius: 18,
+        shadowOffset: { width: 0, height: 6 },
+        elevation: 6,
+      }}
     >
       <View
         style={{
@@ -113,11 +122,13 @@ const styles = StyleSheet.create({
   count: {
     fontSize: 40,
     fontWeight: '800',
+    letterSpacing: -0.5,
     fontVariant: ['tabular-nums'],
   },
   sub: {
     fontSize: 12,
-    fontWeight: '600',
+    fontWeight: '700',
     marginTop: -2,
+    letterSpacing: 0.2,
   },
 });
