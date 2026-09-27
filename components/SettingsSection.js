@@ -1,11 +1,11 @@
 import { LayoutAnimation, Pressable, StyleSheet, Text, View } from 'react-native';
-import { useThemeColors } from '../lib/theme';
+import { useThemeColors, radius } from '../lib/theme';
 
 // Açılır/kapanır ayar bölümü. Animasyon LayoutAnimation ile; reduceMotion
 // true ise animasyonsuz açılır/kapanır.
-// Görsel: yumuşak gölgeli, yuvarlak köşeli "bento" kart; opsiyonel `icon`
-// (emoji) ile başlık hiyerarşisi güçlendirilir. Prop sözleşmesi (title, open,
-// onToggle, reduceMotion, children) aynen korunur — `icon` isteğe bağlıdır.
+// Görsel: sade düz kart — ince kenarlık, çok hafif (veya hiç) gölge; opsiyonel
+// `icon` (emoji) ile başlık hiyerarşisi güçlendirilir. Prop sözleşmesi (title,
+// open, onToggle, reduceMotion, children) aynen korunur — `icon` isteğe bağlıdır.
 export default function SettingsSection({ title, icon, open, onToggle, reduceMotion, children }) {
   const colors = useThemeColors();
   const styles = createStyles(colors);
@@ -40,23 +40,18 @@ export default function SettingsSection({ title, icon, open, onToggle, reduceMot
 }
 
 function createStyles(colors) {
-  // lib/theme.js henüz yumuşak-cam (glass) token'larını yayınlamamış
-  // olabilir (paralel bir ajan ekliyor) — güvenli fallback ile tüket,
-  // theme.js'e dokunma.
-  const glassBorder = colors.glassBorder || colors.border;
-
   return StyleSheet.create({
     wrap: {
       marginBottom: 16,
       backgroundColor: colors.surface,
-      borderRadius: 22,
+      borderRadius: radius.lg,
       borderWidth: 1,
-      borderColor: glassBorder,
+      borderColor: colors.border,
       shadowColor: colors.shadow,
-      shadowOpacity: 0.07,
-      shadowRadius: 14,
-      shadowOffset: { width: 0, height: 6 },
-      elevation: 3,
+      shadowOpacity: 0.05,
+      shadowRadius: 6,
+      shadowOffset: { width: 0, height: 2 },
+      elevation: 1,
     },
     headerRow: {
       flexDirection: 'row',
@@ -65,7 +60,7 @@ function createStyles(colors) {
       paddingVertical: 12,
       paddingHorizontal: 16,
       gap: 12,
-      borderRadius: 22,
+      borderRadius: radius.lg,
     },
     headerRowPressed: {
       backgroundColor: colors.overlay,
@@ -83,9 +78,9 @@ function createStyles(colors) {
     chevron: { fontSize: 16, color: colors.subtext, minWidth: 20, textAlign: 'center' },
     body: {
       overflow: 'hidden',
-      paddingHorizontal: 12,
-      paddingBottom: 14,
-      gap: 10,
+      paddingHorizontal: 16,
+      paddingBottom: 16,
+      gap: 12,
     },
   });
 }

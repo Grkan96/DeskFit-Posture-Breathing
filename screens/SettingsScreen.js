@@ -18,7 +18,7 @@ import AdBanner from '../components/AdBanner';
 import SettingsSection from '../components/SettingsSection';
 import { isPrivacyOptionsRequired, showPrivacyOptions } from '../lib/consent';
 import appConfig from '../app.json';
-import { useThemeColors, useThemePreference } from '../lib/theme';
+import { useThemeColors, useThemePreference, radius } from '../lib/theme';
 import { useTranslation } from '../lib/i18n';
 import { shareApp } from '../lib/sharing';
 import ShareCard from '../components/ShareCard';
@@ -290,7 +290,7 @@ export default function SettingsScreen({
         onToggle={() => toggleSection('reminder')}
         reduceMotion={reduceMotion}
       >
-      <View style={styles.card}>
+      <View style={[styles.card, styles.cardFirst]}>
         <Text style={styles.settingLabel}>{t('settings.alertModeLabel')}</Text>
         <SegmentedControl
           styles={styles}
@@ -461,7 +461,7 @@ export default function SettingsScreen({
         onToggle={() => toggleSection('appearance')}
         reduceMotion={reduceMotion}
       >
-        <View style={styles.card}>
+        <View style={[styles.card, styles.cardFirst]}>
           <Text style={styles.settingLabel}>{t('settings.appearanceLabel')}</Text>
           <SegmentedControl
             styles={styles}
@@ -506,7 +506,7 @@ export default function SettingsScreen({
         onToggle={() => toggleSection('about')}
         reduceMotion={reduceMotion}
       >
-        <View style={styles.card}>
+        <View style={[styles.card, styles.cardFirst]}>
           <View style={styles.cardRow}>
             <Text style={styles.settingLabel}>{t('settings.versionLabel')}</Text>
             <Text style={styles.stepperLabel}>{appConfig?.expo?.version ?? ''}</Text>
@@ -555,26 +555,29 @@ function createStyles(colors) {
     },
     nameCard: {
       backgroundColor: colors.surface,
-      borderRadius: 22,
+      borderRadius: radius.lg,
       borderWidth: 1,
-      borderColor: colors.glassBorder || colors.border,
-      paddingHorizontal: 18,
+      borderColor: colors.border,
+      paddingHorizontal: 16,
       paddingVertical: 16,
       marginBottom: 16,
-      elevation: 3,
+      elevation: 1,
       shadowColor: colors.shadow,
-      shadowOpacity: 0.07,
-      shadowRadius: 14,
-      shadowOffset: { width: 0, height: 6 },
+      shadowOpacity: 0.05,
+      shadowRadius: 6,
+      shadowOffset: { width: 0, height: 2 },
     },
-    // Bölüm (SettingsSection) içindeki alt bento hücreleri: bölümün kendi
-    // gölgesi zaten var, burada sade/hafif kalıp yalnızca ayrım için ince
-    // bir kenarlık kullanılır; boşluk SettingsSection'ın `body` gap'inden gelir.
+    // Bölümün (SettingsSection) kendi kartı zaten çevrede sınır çiziyor;
+    // satırları ayrı kutulara koymak yerine düz liste öğesi yapıp aralarına
+    // ince bir üst kenarlık koyuyoruz — tek bir tutarlı kart, gereksiz iç içe
+    // kutu yok.
     card: {
-      backgroundColor: colors.inputBg,
-      borderRadius: 16,
-      paddingHorizontal: 16,
-      paddingVertical: 14,
+      paddingVertical: 12,
+      borderTopWidth: 1,
+      borderTopColor: colors.border,
+    },
+    cardFirst: {
+      borderTopWidth: 0,
     },
     cardRow: {
       flexDirection: 'row',
@@ -621,8 +624,8 @@ function createStyles(colors) {
       minHeight: 44,
       justifyContent: 'center',
       paddingVertical: 10,
-      borderRadius: 12,
-      backgroundColor: colors.surface,
+      borderRadius: radius.md,
+      backgroundColor: colors.inputBg,
       alignItems: 'center',
       gap: 2,
     },
@@ -659,8 +662,8 @@ function createStyles(colors) {
       flex: 1,
       minHeight: 44,
       paddingVertical: 8,
-      borderRadius: 12,
-      backgroundColor: colors.surface,
+      borderRadius: radius.md,
+      backgroundColor: colors.inputBg,
       alignItems: 'center',
       justifyContent: 'center',
     },
@@ -669,7 +672,7 @@ function createStyles(colors) {
       minHeight: 44,
       paddingVertical: 6,
       paddingHorizontal: 14,
-      borderRadius: 12,
+      borderRadius: radius.md,
       backgroundColor: colors.accentSofter,
       justifyContent: 'center',
     },
@@ -679,7 +682,7 @@ function createStyles(colors) {
       justifyContent: 'center',
       minHeight: 44,
       paddingVertical: 12,
-      borderRadius: 16,
+      borderRadius: radius.lg,
       backgroundColor: colors.accentSofter,
       marginBottom: 8,
     },
@@ -718,8 +721,8 @@ function createStyles(colors) {
     stepperButton: {
       width: 32,
       height: 32,
-      borderRadius: 10,
-      backgroundColor: colors.surface,
+      borderRadius: radius.sm,
+      backgroundColor: colors.inputBg,
       alignItems: 'center',
       justifyContent: 'center',
     },
@@ -739,7 +742,7 @@ function createStyles(colors) {
       minHeight: 44,
       justifyContent: 'center',
       paddingVertical: 12,
-      borderRadius: 14,
+      borderRadius: radius.lg,
       backgroundColor: colors.inputBg,
       alignItems: 'center',
     },
@@ -752,7 +755,7 @@ function createStyles(colors) {
       minHeight: 44,
       justifyContent: 'center',
       paddingVertical: 12,
-      borderRadius: 14,
+      borderRadius: radius.lg,
       backgroundColor: colors.accentSofter,
       alignItems: 'center',
     },

@@ -11,7 +11,7 @@ import { CHALLENGE_DAYS } from '../lib/challenge';
 import { TECHNIQUES } from '../lib/breathingTechniques';
 import { pickSuggestion, MOVEMENT_META, EXERCISE_META } from '../lib/sessionContent';
 import { loadProfile } from '../lib/onboardingProfile';
-import { useThemeColors } from '../lib/theme';
+import { useThemeColors, radius } from '../lib/theme';
 import { useTranslation } from '../lib/i18n';
 
 const CATEGORIES = [
@@ -20,44 +20,7 @@ const CATEGORIES = [
   { id: 'breathing', icon: '🌬️', ready: true },
 ];
 
-const RADIUS_XL = 26;
-const RADIUS_LG = 20;
-
-// 2026 wellness estetiği: ekranın arkasına, bağımlılık eklemeden düşük
-// opaklıklı büyük dairelerle yumuşak bir gradient dokusu verir.
-function GradientBackdrop({ colors }) {
-  const from = colors.gradientFrom || colors.accentSofter;
-  const to = colors.gradientTo || colors.accentSoft;
-  return (
-    <View pointerEvents="none" style={StyleSheet.absoluteFillObject}>
-      <View style={[backdropStyles.blobTop, { backgroundColor: from }]} />
-      <View style={[backdropStyles.blobBottom, { backgroundColor: to }]} />
-    </View>
-  );
-}
-
-const backdropStyles = StyleSheet.create({
-  blobTop: {
-    position: 'absolute',
-    top: -60,
-    right: -90,
-    width: 280,
-    height: 280,
-    borderRadius: 140,
-    opacity: 0.28,
-  },
-  blobBottom: {
-    position: 'absolute',
-    top: 260,
-    left: -110,
-    width: 320,
-    height: 320,
-    borderRadius: 160,
-    opacity: 0.18,
-  },
-});
-
-// Geniş "hero" bento kartı: hızlı mola ve günün önerisi için.
+// Geniş "hero" kartı: hızlı mola ve günün önerisi için.
 function CategoryCard({ styles, icon, title, description, ready, badgeLabel, onPress }) {
   return (
     <Pressable
@@ -159,7 +122,6 @@ export default function MeditationScreen({ onChangeTab }) {
 
   return (
     <View style={styles.screen}>
-      <GradientBackdrop colors={colors} />
       <ScrollView style={styles.container} contentContainerStyle={styles.content}>
         <Text style={styles.emoji}>🌿</Text>
         <Text style={styles.header}>{t('meditation.header')}</Text>
@@ -172,11 +134,12 @@ export default function MeditationScreen({ onChangeTab }) {
             accessibilityRole="button"
             accessibilityLabel={`${t('meditation.statsStreak')} ${stats.streak}, ${t('meditation.statsSessions')} ${stats.totalSessions}. ${t('stats.seeStats')}`}
           >
-            <View style={styles.statBadge}>
+            <View style={styles.statItem}>
               <Text style={styles.statValue}>🔥 {stats.streak}</Text>
               <Text style={styles.statLabel}>{t('meditation.statsStreak')}</Text>
             </View>
-            <View style={styles.statBadge}>
+            <View style={styles.statDivider} />
+            <View style={styles.statItem}>
               <Text style={styles.statValue}>✅ {stats.totalSessions}</Text>
               <Text style={styles.statLabel}>{t('meditation.statsSessions')}</Text>
             </View>
@@ -295,27 +258,25 @@ function createStyles(colors) {
       textAlign: 'center',
       lineHeight: 19,
     },
+    // Sade özet satırı: kutu/gölge yok, sadece ince bir ayraçla ikiye
+    // bölünmüş düz metin — kart sayısını azaltmak için bilinçli olarak
+    // kart değil.
     statsRow: {
       alignSelf: 'stretch',
       flexDirection: 'row',
-      gap: 10,
+      alignItems: 'center',
       marginTop: 16,
       marginBottom: 4,
+      paddingVertical: 8,
     },
-    statBadge: {
+    statItem: {
       flex: 1,
-      backgroundColor: colors.glassBg || colors.surface,
-      borderRadius: RADIUS_LG,
-      borderWidth: 1,
-      borderColor: colors.glassBorder || colors.border,
-      paddingHorizontal: 16,
-      paddingVertical: 12,
       alignItems: 'center',
-      elevation: 1,
-      shadowColor: colors.shadow,
-      shadowOpacity: 0.06,
-      shadowRadius: 8,
-      shadowOffset: { width: 0, height: 2 },
+    },
+    statDivider: {
+      width: 1,
+      height: 24,
+      backgroundColor: colors.border,
     },
     statValue: {
       fontSize: 16,
@@ -328,18 +289,18 @@ function createStyles(colors) {
       color: colors.faint,
       marginTop: 2,
     },
+    // Tek "öne çıkan" kart: hafif accent zemin, ince kenarlık, minimal gölge.
     challengeCard: {
       alignSelf: 'stretch',
       backgroundColor: colors.accentSofter,
-      borderRadius: RADIUS_LG,
+      borderRadius: radius.lg,
       borderWidth: 1,
-      borderColor: colors.glassBorder || colors.border,
-      padding: 18,
+      borderColor: colors.border,
+      padding: 16,
       marginTop: 16,
-      elevation: 1,
       shadowColor: colors.shadow,
-      shadowOpacity: 0.06,
-      shadowRadius: 8,
+      shadowOpacity: 0.05,
+      shadowRadius: 6,
       shadowOffset: { width: 0, height: 2 },
     },
     challengeTitle: {
@@ -357,12 +318,12 @@ function createStyles(colors) {
       marginTop: 10,
       alignSelf: 'flex-start',
       backgroundColor: colors.accent,
-      borderRadius: 10,
+      borderRadius: radius.md,
       paddingHorizontal: 16,
       paddingVertical: 8,
     },
     challengeButtonText: {
-      color: '#ffffff',
+      color: colors.onAccent,
       fontSize: 13,
       fontWeight: '700',
     },
@@ -374,17 +335,17 @@ function createStyles(colors) {
     card: {
       flexDirection: 'row',
       alignItems: 'center',
-      backgroundColor: colors.glassBg || colors.surface,
-      borderRadius: RADIUS_LG,
+      backgroundColor: colors.surface,
+      borderRadius: radius.lg,
       borderWidth: 1,
-      borderColor: colors.glassBorder || colors.border,
+      borderColor: colors.border,
       paddingHorizontal: 16,
       paddingVertical: 16,
-      elevation: 2,
+      elevation: 1,
       shadowColor: colors.shadow,
-      shadowOpacity: 0.08,
-      shadowRadius: 10,
-      shadowOffset: { width: 0, height: 3 },
+      shadowOpacity: 0.05,
+      shadowRadius: 6,
+      shadowOffset: { width: 0, height: 2 },
     },
     cardPressed: {
       opacity: 0.8,
@@ -407,7 +368,7 @@ function createStyles(colors) {
       color: colors.muted,
       lineHeight: 17,
     },
-    // Hareketler/egzersizler/nefes için 2 sütunlu bento ızgara.
+    // Hareketler/egzersizler/nefes için 2 sütunlu ızgara.
     grid: {
       alignSelf: 'stretch',
       flexDirection: 'row',
@@ -419,19 +380,19 @@ function createStyles(colors) {
       flexBasis: '47%',
       flexGrow: 1,
       minHeight: 132,
-      backgroundColor: colors.glassBg || colors.surface,
-      borderRadius: RADIUS_LG,
+      backgroundColor: colors.surface,
+      borderRadius: radius.lg,
       borderWidth: 1,
-      borderColor: colors.glassBorder || colors.border,
+      borderColor: colors.border,
       paddingHorizontal: 14,
       paddingVertical: 16,
       alignItems: 'center',
       justifyContent: 'center',
-      elevation: 2,
+      elevation: 1,
       shadowColor: colors.shadow,
-      shadowOpacity: 0.08,
-      shadowRadius: 10,
-      shadowOffset: { width: 0, height: 3 },
+      shadowOpacity: 0.05,
+      shadowRadius: 6,
+      shadowOffset: { width: 0, height: 2 },
     },
     gridTileIcon: {
       fontSize: 26,
@@ -455,8 +416,8 @@ function createStyles(colors) {
       marginTop: 8,
     },
     badge: {
-      backgroundColor: colors.border,
-      borderRadius: 8,
+      backgroundColor: colors.inputBg,
+      borderRadius: radius.sm,
       paddingHorizontal: 8,
       paddingVertical: 4,
       marginLeft: 8,
