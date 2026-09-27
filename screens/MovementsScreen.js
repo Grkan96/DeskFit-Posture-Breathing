@@ -1,10 +1,12 @@
 import StepSession from '../components/StepSession';
 import { MOVEMENT_META } from '../lib/sessionContent';
+import { useThemeColors } from '../lib/theme';
 import { useTranslation } from '../lib/i18n';
 
 // Görsel metinler (title/instruction) lib/locales/{tr,en}.js içindeki
 // movements.items.<id> anahtarlarında, meta veri lib/sessionContent.js'de tutulur.
 export default function MovementsScreen({ onBack, autoStart = false }) {
+  const colors = useThemeColors();
   const { t } = useTranslation();
   const steps = MOVEMENT_META.map((m) => ({
     ...m,
@@ -20,6 +22,7 @@ export default function MovementsScreen({ onBack, autoStart = false }) {
       onBack={onBack}
       idleIcon="🧘"
       type="movements"
+      tint={{ from: colors.accentSofter, to: colors.accentSoft }}
       autoStart={autoStart}
     />
   );

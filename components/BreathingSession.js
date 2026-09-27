@@ -10,6 +10,43 @@ import { CountdownRing, phaseColor, successHaptic, tapHaptic, useReduceMotion } 
 const REST_SCALE = 0.75;
 const CIRCLE = 170;
 const RING = 250;
+const RADIUS_XL = 28;
+const RADIUS_PILL = 20;
+
+// 2026 wellness estetiği: seans arka planına iki yumuşak "blob" ile hafif bir
+// gradient hissi verir. Gerçek LinearGradient/blur bağımlılığı eklemeden,
+// düşük opaklıklı büyük daireler üst üste bindirilerek sakin bir doku elde edilir.
+function GradientBackdrop({ colors }) {
+  const from = colors.gradientFrom || colors.accentSofter;
+  const to = colors.gradientTo || colors.accentSoft;
+  return (
+    <View pointerEvents="none" style={StyleSheet.absoluteFillObject}>
+      <View style={[backdropStyles.blobTop, { backgroundColor: from }]} />
+      <View style={[backdropStyles.blobBottom, { backgroundColor: to }]} />
+    </View>
+  );
+}
+
+const backdropStyles = StyleSheet.create({
+  blobTop: {
+    position: 'absolute',
+    top: -90,
+    right: -70,
+    width: 300,
+    height: 300,
+    borderRadius: 150,
+    opacity: 0.32,
+  },
+  blobBottom: {
+    position: 'absolute',
+    bottom: -110,
+    left: -80,
+    width: 320,
+    height: 320,
+    borderRadius: 160,
+    opacity: 0.24,
+  },
+});
 
 function initialSession(phases) {
   return { phaseIndex: 0, secondsLeft: phases[0].seconds, cycle: 1, done: false };
@@ -100,6 +137,7 @@ export default function BreathingSession({ technique, onBack, autoStart = false,
 
   return (
     <View style={styles.container}>
+      <GradientBackdrop colors={colors} />
       <Pressable
         onPress={onBack}
         style={styles.backButton}
@@ -191,6 +229,8 @@ function createStyles(colors) {
       alignItems: 'center',
       paddingHorizontal: 24,
       paddingTop: 16,
+      backgroundColor: colors.bg,
+      overflow: 'hidden',
     },
     backButton: {
       alignSelf: 'flex-start',
@@ -218,8 +258,20 @@ function createStyles(colors) {
     },
     circleWrap: {
       flex: 1,
+      alignSelf: 'stretch',
       alignItems: 'center',
       justifyContent: 'center',
+      marginTop: 16,
+      marginBottom: 16,
+      borderRadius: RADIUS_XL,
+      backgroundColor: colors.glassBg || colors.surface,
+      borderWidth: 1,
+      borderColor: colors.glassBorder || colors.border,
+      elevation: 2,
+      shadowColor: colors.shadow,
+      shadowOpacity: 0.08,
+      shadowRadius: 16,
+      shadowOffset: { width: 0, height: 6 },
     },
     circle: {
       position: 'absolute',
@@ -267,11 +319,16 @@ function createStyles(colors) {
     },
     actionButton: {
       alignSelf: 'stretch',
-      borderRadius: 14,
+      borderRadius: RADIUS_PILL,
       minHeight: 52,
       justifyContent: 'center',
       alignItems: 'center',
       marginBottom: 24,
+      elevation: 1,
+      shadowColor: colors.shadow,
+      shadowOpacity: 0.12,
+      shadowRadius: 10,
+      shadowOffset: { width: 0, height: 4 },
     },
     actionButtonStart: {
       backgroundColor: colors.accent,
