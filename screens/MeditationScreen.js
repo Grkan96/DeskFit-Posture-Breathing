@@ -3,6 +3,7 @@ import { Alert, ScrollView, StyleSheet, Text, View, Pressable } from 'react-nati
 import BreathingScreen from './BreathingScreen';
 import MovementsScreen from './MovementsScreen';
 import ExercisesScreen from './ExercisesScreen';
+import ErgonomicsTipsScreen from './ErgonomicsTipsScreen';
 import AdBanner from '../components/AdBanner';
 import BreathingSession from '../components/BreathingSession';
 import QuickBreak from '../components/QuickBreak';
@@ -18,6 +19,7 @@ const CATEGORIES = [
   { id: 'movements', icon: '🧘', ready: true },
   { id: 'exercises', icon: '💪', ready: true },
   { id: 'breathing', icon: '🌬️', ready: true },
+  { id: 'tips', icon: '📋', ready: true },
 ];
 
 const RADIUS_XL = 26;
@@ -155,6 +157,9 @@ export default function MeditationScreen({ onChangeTab }) {
   }
   if (activeSession === 'exercises') {
     return <ExercisesScreen onBack={back} />;
+  }
+  if (activeSession === 'tips') {
+    return <ErgonomicsTipsScreen onBack={back} />;
   }
 
   return (
