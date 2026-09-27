@@ -6,41 +6,36 @@ import {
   Easing,
   Modal,
   Pressable,
-  ScrollView,
   StyleSheet,
   Text,
   TextInput,
   View,
 } from 'react-native';
+import Svg, { Line, Path } from 'react-native-svg';
 import * as Haptics from 'expo-haptics';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import ProgressRing from '../components/ProgressRing';
-import WeekStrip from '../components/WeekStrip';
+import PostureDial, { DIAL_COLORS } from '../components/PostureDial';
 import QuickBreak from '../components/QuickBreak';
-import Companion from '../components/Companion';
-import GradientCard from '../components/GradientCard';
 import AdBanner from '../components/AdBanner';
 import { getStats, getLast7Days } from '../lib/stats';
-import {
-  DAILY_GOAL,
-  displayStreak,
-  remainingFromTarget,
-  countdownProgress,
-} from '../lib/homeProgress';
-import { useThemeColors, radius } from '../lib/theme';
+import { displayStreak, remainingFromTarget, countdownProgress } from '../lib/homeProgress';
+import { useThemeColors } from '../lib/theme';
 import { useTranslation } from '../lib/i18n';
 
+// "Kadran" ekranı: koyu antrasit + amber enstrüman panosu kimliği. Bu ekran
+// KASITLI olarak sistem açık/koyu tema ayarından bağımsızdır — lib/theme.js
+// buradaki kadranın kendi rengine dokunmaz (yalnızca MOLA modalindeki
+// QuickBreak akışı, kendi ekranı olduğu için, normal temayı kullanır).
 const INTERVALS = [15, 30, 45, 60];
 const MIN_MINUTES = 1;
 const MAX_CUSTOM_MINUTES = 600;
-const BUTTON_SIZE = 124;
 
 function formatHour(hour) {
   return `${String(hour).padStart(2, '0')}:00`;
 }
 
 function formatCountdown(totalSeconds) {
-  const s = Math.max(0, totalSeconds);
+  const s = Math.max(0, Math.round(totalSeconds));
   const h = Math.floor(s / 3600);
   const m = Math.floor((s % 3600) / 60);
   const sec = s % 60;
@@ -54,7 +49,10 @@ function formatCountdown(totalSeconds) {
 function useCountdown(isRunning, intervalMinutes, nextReminderAt) {
   const [remaining, setRemaining] = useState(intervalMinutes * 60);
   useEffect(() => {
-    if (!isRunning) return undefined;
+    if (!isRunning) {
+      setRemaining(intervalMinutes * 60);
+      return undefined;
+    }
     const period = intervalMinutes * 60;
     const startedAt = Date.now();
     const tick = () => {
@@ -73,6 +71,80 @@ function useCountdown(isRunning, intervalMinutes, nextReminderAt) {
   return remaining;
 }
 
+// Minimalist fincan ikonu (feather-icons "coffee" hattı) — MOLA butonunun yanında.
+function CupIcon({ size = 16, color = DIAL_COLORS.text }) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <Path
+        d="M18 8h1a4 4 0 010 8h-1"
+        stroke={color}
+        strokeWidth={2}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <Path
+        d="M2 8h16v9a4 4 0 01-4 4H6a4 4 0 01-4-4V8z"
+        stroke={color}
+        strokeWidth={2}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <Line x1="6" y1="1" x2="6" y2="4" stroke={color} strokeWidth={2} strokeLinecap="round" />
+      <Line x1="10" y1="1" x2="10" y2="4" stroke={color} strokeWidth={2} strokeLinecap="round" />
+      <Line x1="14" y1="1" x2="14" y2="4" stroke={color} strokeWidth={2} strokeLinecap="round" />
+    </Svg>
+  );
+}
+
+// 60x32 pill toggle — mockup'taki running/duraklatıldı anahtarı.
+function RunToggle({ value, onPress, reduceMotion, accessibilityLabel, accessibilityHint }) {
+  const anim = useRef(new Animated.Value(value ? 1 : 0)).current;
+  useEffect(() => {
+    if (reduceMotion) {
+      anim.setValue(value ? 1 : 0);
+      return;
+    }
+    Animated.timing(anim, {
+      toValue: value ? 1 : 0,
+      duration: 180,
+      easing: Easing.out(Easing.quad),
+      useNativeDriver: false,
+    }).start();
+  }, [value, reduceMotion, anim]);
+
+  const left = anim.interpolate({ inputRange: [0, 1], outputRange: [3, 31] });
+  const trackColor = anim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [DIAL_COLORS.track, DIAL_COLORS.amberSoft],
+  });
+
+  return (
+    <Pressable
+      onPress={onPress}
+      accessibilityRole="switch"
+      accessibilityState={{ checked: value }}
+      accessibilityLabel={accessibilityLabel}
+      accessibilityHint={accessibilityHint}
+      hitSlop={{ top: 7, bottom: 7, left: 4, right: 4 }}
+      style={styles.toggleHitArea}
+    >
+      <Animated.View style={[styles.toggleTrack, { backgroundColor: trackColor }]}>
+        <Animated.View style={[styles.toggleKnob, { left }]} />
+      </Animated.View>
+    </Pressable>
+  );
+}
+
+// GÜN SERİ / BUGÜN gibi küçük enstrüman-panosu okuma panelleri.
+function StatPanel({ label, value, accessibilityLabel }) {
+  return (
+    <View style={styles.panel} accessible accessibilityLabel={accessibilityLabel}>
+      <Text style={styles.panelLabel}>{label}</Text>
+      <Text style={styles.panelValue}>{value}</Text>
+    </View>
+  );
+}
+
 export default function HomeScreen({
   userName,
   isRunning,
@@ -85,8 +157,9 @@ export default function HomeScreen({
   onIntervalCommit,
   nextReminderAt = null,
 }) {
-  const colors = useThemeColors();
-  const styles = createStyles(colors);
+  // Sadece MOLA modalindeki QuickBreak akışı (kendi ekranı) için — kadranın
+  // kendisi bu renkleri KULLANMAZ, bkz. dosya başındaki not.
+  const themeColors = useThemeColors();
   const { t } = useTranslation();
   const [customText, setCustomText] = useState('');
   const [reduceMotion, setReduceMotion] = useState(false);
@@ -94,10 +167,7 @@ export default function HomeScreen({
   const insets = useSafeAreaInsets();
   const [stats, setStats] = useState(null);
   const [breakOpen, setBreakOpen] = useState(false);
-  const [celebrateKey, setCelebrateKey] = useState(0);
-  const prevCount = useRef(null);
   const mountedRef = useRef(true);
-  const pulse = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     let mounted = true;
@@ -112,13 +182,6 @@ export default function HomeScreen({
   const loadStats = useCallback(async () => {
     const s = await getStats();
     if (!mountedRef.current) return;
-    const count = getLast7Days(s.history || {})[6].count;
-    // Yalnızca ekran açıkken hedefin altından üstüne geçişte kutla.
-    if (prevCount.current !== null && prevCount.current < DAILY_GOAL && count >= DAILY_GOAL) {
-      setCelebrateKey((k) => k + 1);
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
-    }
-    prevCount.current = count;
     setStats(s);
   }, []);
 
@@ -140,24 +203,6 @@ export default function HomeScreen({
     loadStats();
   }
 
-  // Çalışırken "nefes alan" halka animasyonu.
-  useEffect(() => {
-    if (!isRunning || reduceMotion) {
-      pulse.setValue(0);
-      return undefined;
-    }
-    const loop = Animated.loop(
-      Animated.timing(pulse, {
-        toValue: 1,
-        duration: 2400,
-        easing: Easing.out(Easing.quad),
-        useNativeDriver: true,
-      })
-    );
-    loop.start();
-    return () => loop.stop();
-  }, [isRunning, reduceMotion, pulse]);
-
   function commitCustom() {
     const parsed = parseInt(customText, 10);
     if (Number.isFinite(parsed)) {
@@ -167,212 +212,174 @@ export default function HomeScreen({
     setCustomText('');
   }
 
-  function handleMainPress() {
+  function handleToggle() {
     Haptics.impactAsync(
       isRunning ? Haptics.ImpactFeedbackStyle.Light : Haptics.ImpactFeedbackStyle.Heavy
     ).catch(() => {});
     onStartStop();
   }
 
-  const ringColor = isRunning ? colors.danger : colors.accent;
-  const ringStyle = {
-    opacity: pulse.interpolate({ inputRange: [0, 1], outputRange: [0.35, 0] }),
-    transform: [{ scale: pulse.interpolate({ inputRange: [0, 1], outputRange: [1, 1.55] }) }],
-  };
-  const progress = countdownProgress(remaining, intervalMinutes * 60);
+  function handleSelectInterval(minutes) {
+    Haptics.selectionAsync().catch(() => {});
+    onIntervalCommit(minutes);
+  }
+
+  function handleBreakPress() {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
+    setBreakOpen(true);
+  }
+
+  const periodSeconds = intervalMinutes * 60;
+  const progress = isRunning ? countdownProgress(remaining, periodSeconds) : 0;
+  const centerValue = isRunning ? formatCountdown(remaining) : formatCountdown(periodSeconds);
+  const centerLabel = isRunning ? t('home.nextReminderLabel') : t('home.statusPaused');
+
   const days = getLast7Days((stats && stats.history) || {});
-  const todayCount = days[6].count;
   const streak = displayStreak(stats);
   const weekLabels = t('home.weekDays').split(',');
-  const goalReached = todayCount >= DAILY_GOAL;
+
+  const statusLabel = isRunning
+    ? t('home.statusActiveShort', { minutes: intervalMinutes }) +
+      (quietHoursEnabled
+        ? t('home.quietSuffix', { start: formatHour(quietStart), end: formatHour(quietEnd) })
+        : '')
+    : t('home.statusPaused');
+
+  const intervalItems = INTERVALS.map((minutes) => ({
+    minutes,
+    label: t('home.minutesLabel', { minutes }),
+    selected: minutes === intervalMinutes,
+  }));
 
   return (
     <View style={styles.screen}>
-      <ScrollView
-        style={styles.scroll}
-        contentContainerStyle={styles.container}
-        keyboardShouldPersistTaps="handled"
-        showsVerticalScrollIndicator={false}
+      <View
+        style={[styles.content, { paddingTop: insets.top + 16, paddingBottom: insets.bottom + 10 }]}
       >
-      <View style={styles.header}>
-        <Text style={styles.greeting} accessibilityRole="header">
-          {t('home.greeting', { name: userName })}
-        </Text>
-        <Text style={styles.subtitle}>
-          {isRunning
-            ? t('home.statusActive', { minutes: intervalMinutes }) +
-              (quietHoursEnabled
-                ? t('home.quietSuffix', { start: formatHour(quietStart), end: formatHour(quietEnd) })
-                : '')
-            : t('home.statusInactive')}
-        </Text>
-        {todayReminderCount > 0 && (
-          <View style={styles.countPill}>
-            <Text style={styles.countPillText}>
-              {t('home.reminderCount', { count: todayReminderCount })}
+        <View style={styles.headerRow}>
+          <View style={styles.statusGroup}>
+            <View
+              style={[styles.dot, { backgroundColor: isRunning ? DIAL_COLORS.amber : DIAL_COLORS.faint }]}
+            />
+            <Text style={styles.statusText} numberOfLines={1}>
+              {statusLabel}
             </Text>
           </View>
-        )}
-      </View>
-
-      {/* Bento hero card: today's streak, posture ring and week strip together
-          on the soft sage-green -> sky-blue gradient with a glass panel. */}
-      <GradientCard style={styles.heroCard} contentStyle={styles.heroContent}>
-        <Text
-          style={styles.streakText}
-          accessibilityLabel={streak > 0 ? t('home.streakA11y', { count: streak }) : t('home.streakNone')}
-        >
-          {streak > 0 ? t('home.streakLabel', { count: streak }) : t('home.streakNone')}
-        </Text>
-
-        <View style={styles.ringWrap}>
-          <Text style={styles.ringTitle}>{t('home.ringTitle')}</Text>
-          <ProgressRing
-            count={todayCount}
-            goal={DAILY_GOAL}
-            color={colors.accent}
-            trackColor={colors.glassBorder}
-            textColor={colors.text}
-            subColor={colors.subtext}
-            subLabel={t('home.ringSub', { goal: DAILY_GOAL })}
-            reduceMotion={reduceMotion}
-            celebrateKey={celebrateKey}
-            accessibilityLabel={t('home.ringA11y', { count: todayCount, goal: DAILY_GOAL })}
-          />
-          <Text style={[styles.ringCaption, goalReached && styles.ringCaptionDone]}>
-            {goalReached
-              ? t('home.ringDone')
-              : t('home.ringRemaining', { left: DAILY_GOAL - todayCount })}
+          <Text style={styles.userName} numberOfLines={1}>
+            {userName}
           </Text>
         </View>
 
-        <WeekStrip
-          days={days}
-          labels={weekLabels}
-          colors={colors}
-          todayLabel={t('home.weekToday')}
-          doneLabel={t('home.weekDone')}
-          missedLabel={t('home.weekMissed')}
-        />
-      </GradientCard>
+        {todayReminderCount > 0 && (
+          <Text style={styles.reminderCountLine}>
+            {t('home.reminderCount', { count: todayReminderCount })}
+          </Text>
+        )}
 
-      {/* Action card: START/STOP plus the live countdown while running. */}
-      <GradientCard
-        variant="soft"
-        style={styles.actionCard}
-        contentStyle={styles.actionCardContent}
-      >
-        <View style={styles.buttonWrap}>
-          {isRunning && !reduceMotion && (
-            <Animated.View
-              pointerEvents="none"
-              style={[styles.ring, { backgroundColor: ringColor }, ringStyle]}
+        <View style={styles.dialSection}>
+          <PostureDial
+            centerAccessibilityLabel={
+              isRunning
+                ? `${t('home.nextReminderLabel')}: ${centerValue}`
+                : `${t('home.statusPaused')}: ${centerValue}`
+            }
+            progress={progress}
+            centerValue={centerValue}
+            centerLabel={centerLabel}
+            intervalItems={intervalItems}
+            onSelectInterval={handleSelectInterval}
+            reduceMotion={reduceMotion}
+          />
+
+          <View style={styles.customRow}>
+            <Text style={styles.customLabel}>{t('home.customPlaceholder')}:</Text>
+            <TextInput
+              value={customText}
+              onChangeText={(txt) => setCustomText(txt.replace(/[^0-9]/g, ''))}
+              onSubmitEditing={commitCustom}
+              onBlur={() => customText && commitCustom()}
+              placeholder="15–600"
+              placeholderTextColor={DIAL_COLORS.faint}
+              keyboardType="number-pad"
+              returnKeyType="done"
+              accessibilityLabel={t('home.customInputLabel')}
+              style={styles.customInput}
+              maxLength={3}
             />
-          )}
-          <Pressable
-            onPress={handleMainPress}
-            accessibilityRole="button"
-            accessibilityLabel={isRunning ? t('home.stop') : t('home.start')}
-            accessibilityHint={isRunning ? t('home.stopHint') : t('home.startHint')}
-            style={({ pressed }) => [
-              styles.mainButton,
-              isRunning ? styles.mainButtonStop : styles.mainButtonStart,
-              pressed && styles.mainButtonPressed,
-            ]}
-          >
-            <Text style={[styles.mainButtonText, isRunning && styles.mainButtonTextStop]}>
-              {isRunning ? t('home.stop') : t('home.start')}
-            </Text>
-          </Pressable>
+            <Text style={styles.customLabel}>{t('home.minuteUnit')}</Text>
+          </View>
         </View>
 
-        {isRunning && (
-          <View
-            style={styles.countdownWrap}
-            accessible
-            accessibilityLabel={`${t('home.nextReminderLabel')}: ${formatCountdown(remaining)}`}
-          >
-            <Text style={styles.countdownLabel}>
-              {t('home.nextIn', { time: '' }).trim()}
-            </Text>
-            <Text style={styles.countdownValue}>{formatCountdown(remaining)}</Text>
-            <View style={styles.progressTrack}>
-              <View style={[styles.progressFill, { width: `${Math.round(progress * 100)}%` }]} />
-            </View>
-          </View>
-        )}
-      </GradientCard>
-
-      {/* Break card, its own bento tile. */}
-      <GradientCard
-        variant="soft"
-        style={styles.breakCard}
-        contentStyle={styles.breakCardContent}
-        cornerRadius={radius.lg}
-      >
-        <Pressable
-          onPress={() => {
-            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
-            setBreakOpen(true);
-          }}
-          accessibilityRole="button"
-          accessibilityLabel={t('home.breakNow')}
-          accessibilityHint={t('home.breakNowHint')}
-          style={({ pressed }) => [styles.breakButton, pressed && styles.chipPressed]}
+        <View
+          style={styles.weekRow}
+          accessible={false}
+          importantForAccessibility="no-hide-descendants"
         >
-          <Text style={styles.breakButtonText}>{t('home.breakNow')}</Text>
-        </Pressable>
-      </GradientCard>
-
-      <GradientCard
-        variant="soft"
-        style={styles.intervalCard}
-        contentStyle={styles.intervalCardContent}
-        cornerRadius={radius.lg}
-      >
-        <Text style={styles.sectionLabel}>{t('home.intervalSectionLabel')}</Text>
-        <View style={styles.intervalRow}>
-          {INTERVALS.map((minutes) => {
-            const selected = minutes === intervalMinutes;
+          {days.map((d, i) => {
+            const done = d.count > 0;
+            const isToday = i === days.length - 1;
+            const name = weekLabels[d.weekday] || '';
+            const a11y = `${name}${isToday ? `, ${t('home.weekToday')}` : ''}: ${
+              done ? t('home.weekDone') : t('home.weekMissed')
+            }`;
             return (
-              <Pressable
-                key={minutes}
-                onPress={() => {
-                  Haptics.selectionAsync().catch(() => {});
-                  onIntervalCommit(minutes);
-                }}
-                accessibilityRole="button"
-                accessibilityState={{ selected }}
-                accessibilityLabel={t('home.minutesLabel', { minutes })}
-                style={({ pressed }) => [
-                  styles.chip,
-                  selected && styles.chipSelected,
-                  pressed && styles.chipPressed,
-                ]}
+              <View
+                key={d.date}
+                style={styles.weekCell}
+                accessible
+                importantForAccessibility="yes"
+                accessibilityLabel={a11y}
               >
-                <Text style={[styles.chipValue, selected && styles.chipValueSelected]}>
-                  {minutes}
-                </Text>
-                <Text style={[styles.chipUnit, selected && styles.chipUnitSelected]}>
-                  {t('home.minuteUnit')}
-                </Text>
-              </Pressable>
+                <View
+                  style={[
+                    styles.weekBar,
+                    done ? styles.weekBarDone : styles.weekBarEmpty,
+                    isToday && styles.weekBarToday,
+                  ]}
+                />
+                <Text style={[styles.weekLabel, isToday && styles.weekLabelToday]}>{name}</Text>
+              </View>
             );
           })}
-          <TextInput
-            value={customText}
-            onChangeText={(txt) => setCustomText(txt.replace(/[^0-9]/g, ''))}
-            onSubmitEditing={commitCustom}
-            onBlur={() => customText && commitCustom()}
-            placeholder={t('home.customPlaceholder')}
-            placeholderTextColor={colors.faint}
-            keyboardType="number-pad"
-            returnKeyType="done"
-            accessibilityLabel={t('home.customInputLabel')}
-            style={styles.customChip}
+        </View>
+
+        <View style={styles.statsRow}>
+          <StatPanel
+            label={t('home.streakPanelLabel')}
+            value={streak}
+            accessibilityLabel={
+              streak > 0 ? t('home.streakA11y', { count: streak }) : t('home.streakNone')
+            }
+          />
+          {todayReminderCount > 0 && (
+            <StatPanel
+              label={t('home.todayPanelLabel')}
+              value={todayReminderCount}
+              accessibilityLabel={t('home.reminderCount', { count: todayReminderCount })}
+            />
+          )}
+          <RunToggle
+            value={isRunning}
+            onPress={handleToggle}
+            reduceMotion={reduceMotion}
+            accessibilityLabel={isRunning ? t('home.stop') : t('home.start')}
+            accessibilityHint={isRunning ? t('home.stopHint') : t('home.startHint')}
           />
         </View>
-      </GradientCard>
+
+        <View style={styles.breakRow}>
+          <Pressable
+            onPress={handleBreakPress}
+            accessibilityRole="button"
+            accessibilityLabel={t('home.breakNow')}
+            accessibilityHint={t('home.breakNowHint')}
+            style={({ pressed }) => [styles.breakButton, pressed && styles.breakButtonPressed]}
+          >
+            <CupIcon size={15} color={DIAL_COLORS.text} />
+            <Text style={styles.breakButtonText}>{t('home.breakShortLabel')}</Text>
+          </Pressable>
+        </View>
+      </View>
 
       <Modal
         visible={breakOpen}
@@ -382,7 +389,7 @@ export default function HomeScreen({
         <View
           style={{
             flex: 1,
-            backgroundColor: colors.bg,
+            backgroundColor: themeColors.bg,
             paddingTop: insets.top,
             paddingBottom: insets.bottom,
           }}
@@ -391,284 +398,193 @@ export default function HomeScreen({
         </View>
       </Modal>
 
-      {/* Küçük duruş dostu maskot — seriye ve halka doluluğuna göre ruh hali gösterir. */}
-      <Companion
-        streak={streak}
-        ringFraction={DAILY_GOAL > 0 ? Math.min(1, Math.max(0, todayCount / DAILY_GOAL)) : 0}
-        style={{ marginTop: 4, marginBottom: 4 }}
-      />
-      </ScrollView>
       <AdBanner />
     </View>
   );
 }
 
-function createStyles(colors) {
-  return StyleSheet.create({
-    screen: {
-      flex: 1,
-    },
-    scroll: {
-      flex: 1,
-    },
-    container: {
-      alignItems: 'stretch',
-      paddingHorizontal: 20,
-      paddingTop: 12,
-      paddingBottom: 12,
-      gap: 10,
-    },
-    header: {
-      alignItems: 'center',
-      gap: 3,
-    },
-    greeting: {
-      fontSize: 24,
-      fontWeight: '800',
-      letterSpacing: -0.4,
-      color: colors.text,
-      textAlign: 'center',
-    },
-    subtitle: {
-      fontSize: 14,
-      lineHeight: 19,
-      color: colors.subtext,
-      textAlign: 'center',
-    },
-    countPill: {
-      marginTop: 4,
-      paddingVertical: 6,
-      paddingHorizontal: 12,
-      borderRadius: 999,
-      backgroundColor: colors.accentSofter,
-    },
-    countPillText: {
-      fontSize: 12,
-      fontWeight: '700',
-      color: colors.accentText,
-    },
-    // Hero bento card (gradient + glass).
-    heroCard: {},
-    heroContent: {
-      alignItems: 'center',
-      paddingVertical: 14,
-      paddingHorizontal: 16,
-      gap: 2,
-    },
-    streakText: {
-      fontSize: 16,
-      fontWeight: '800',
-      letterSpacing: -0.2,
-      color: colors.text,
-    },
-    ringWrap: {
-      alignItems: 'center',
-      marginTop: 8,
-      marginBottom: 8,
-    },
-    ringTitle: {
-      fontSize: 11,
-      fontWeight: '700',
-      color: colors.subtext,
-      textTransform: 'uppercase',
-      letterSpacing: 1.2,
-      marginBottom: 8,
-    },
-    ringCaption: {
-      marginTop: 8,
-      fontSize: 12,
-      fontWeight: '600',
-      color: colors.subtext,
-      textAlign: 'center',
-    },
-    ringCaptionDone: {
-      color: colors.accentText,
-      fontWeight: '800',
-    },
-    // Action bento card: START/STOP + countdown.
-    actionCard: {},
-    actionCardContent: {
-      alignItems: 'center',
-      paddingVertical: 14,
-      paddingHorizontal: 16,
-    },
-    breakCard: {},
-    breakCardContent: {
-      alignItems: 'center',
-      paddingVertical: 10,
-      paddingHorizontal: 16,
-    },
-    intervalCard: {},
-    intervalCardContent: {
-      alignItems: 'center',
-      paddingVertical: 12,
-      paddingHorizontal: 16,
-    },
-    buttonWrap: {
-      alignSelf: 'center',
-      width: BUTTON_SIZE,
-      height: BUTTON_SIZE,
-      alignItems: 'center',
-      justifyContent: 'center',
-    },
-    ring: {
-      position: 'absolute',
-      width: BUTTON_SIZE,
-      height: BUTTON_SIZE,
-      borderRadius: BUTTON_SIZE / 2,
-    },
-    mainButton: {
-      width: BUTTON_SIZE,
-      height: BUTTON_SIZE,
-      borderRadius: BUTTON_SIZE / 2,
-      alignItems: 'center',
-      justifyContent: 'center',
-      elevation: 8,
-      shadowColor: colors.shadow,
-      shadowOpacity: 0.25,
-      shadowRadius: 16,
-      shadowOffset: { width: 0, height: 8 },
-    },
-    mainButtonStart: {
-      backgroundColor: colors.accent,
-    },
-    mainButtonStop: {
-      backgroundColor: colors.danger,
-    },
-    mainButtonPressed: {
-      opacity: 0.9,
-      transform: [{ scale: 0.95 }],
-    },
-    mainButtonText: {
-      color: colors.onAccent,
-      fontSize: 19,
-      fontWeight: '800',
-      letterSpacing: 1.5,
-    },
-    mainButtonTextStop: {
-      color: colors.onDanger,
-    },
-    countdownWrap: {
-      alignSelf: 'stretch',
-      alignItems: 'center',
-      marginTop: 12,
-      paddingTop: 10,
-      borderTopWidth: 1,
-      borderTopColor: colors.border,
-    },
-    countdownLabel: {
-      fontSize: 12,
-      fontWeight: '600',
-      color: colors.subtext,
-    },
-    countdownValue: {
-      marginTop: 2,
-      fontSize: 30,
-      fontWeight: '800',
-      color: colors.text,
-      fontVariant: ['tabular-nums'],
-    },
-    progressTrack: {
-      alignSelf: 'stretch',
-      height: 6,
-      marginTop: 8,
-      borderRadius: 3,
-      overflow: 'hidden',
-      backgroundColor: colors.inputBg,
-    },
-    progressFill: {
-      height: 6,
-      borderRadius: 3,
-      backgroundColor: colors.accent,
-    },
-    breakButton: {
-      minHeight: 48,
-      paddingVertical: 12,
-      paddingHorizontal: 24,
-      borderRadius: 999,
-      backgroundColor: colors.accentSofter,
-      borderWidth: 1.5,
-      borderColor: colors.accent,
-      alignItems: 'center',
-      justifyContent: 'center',
-    },
-    breakButtonText: {
-      fontSize: 16,
-      fontWeight: '800',
-      color: colors.accentText,
-    },
-    sectionLabel: {
-      alignSelf: 'flex-start',
-      fontSize: 12,
-      fontWeight: '700',
-      color: colors.subtext,
-      marginBottom: 10,
-      textTransform: 'uppercase',
-      letterSpacing: 1.2,
-    },
-    intervalRow: {
-      flexDirection: 'row',
-      flexWrap: 'wrap',
-      justifyContent: 'center',
-      gap: 10,
-    },
-    chip: {
-      flexDirection: 'row',
-      gap: 3,
-      minHeight: 48,
-      paddingVertical: 12,
-      paddingHorizontal: 16,
-      borderRadius: 999,
-      minWidth: 64,
-      justifyContent: 'center',
-      alignItems: 'center',
-      backgroundColor: colors.surface,
-      borderWidth: 1.5,
-      borderColor: colors.border,
-    },
-    chipSelected: {
-      backgroundColor: colors.accent,
-      borderColor: colors.accent,
-      elevation: 3,
-      shadowColor: colors.accent,
-      shadowOpacity: 0.35,
-      shadowRadius: 6,
-      shadowOffset: { width: 0, height: 3 },
-    },
-    chipPressed: {
-      opacity: 0.75,
-      transform: [{ scale: 0.96 }],
-    },
-    chipValue: {
-      fontSize: 16,
-      fontWeight: '800',
-      color: colors.text,
-    },
-    chipValueSelected: {
-      color: colors.onAccent,
-    },
-    chipUnit: {
-      fontSize: 12,
-      fontWeight: '600',
-      color: colors.muted,
-    },
-    chipUnitSelected: {
-      color: colors.onAccent,
-    },
-    customChip: {
-      minHeight: 48,
-      paddingVertical: 12,
-      paddingHorizontal: 12,
-      borderRadius: 999,
-      minWidth: 72,
-      backgroundColor: colors.surface,
-      borderWidth: 1.5,
-      borderColor: colors.borderStrong,
-      borderStyle: 'dashed',
-      color: colors.text,
-      fontSize: 14,
-      fontWeight: '700',
-      textAlign: 'center',
-    },
-  });
-}
+const styles = StyleSheet.create({
+  screen: {
+    flex: 1,
+    backgroundColor: DIAL_COLORS.bg,
+  },
+  content: {
+    flex: 1,
+    paddingHorizontal: 26,
+  },
+  headerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
+  },
+  statusGroup: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    flexShrink: 1,
+  },
+  dot: {
+    width: 7,
+    height: 7,
+    borderRadius: 3.5,
+  },
+  statusText: {
+    fontFamily: 'monospace',
+    fontSize: 11,
+    fontWeight: '600',
+    letterSpacing: 1.2,
+    color: DIAL_COLORS.subtext,
+    flexShrink: 1,
+  },
+  userName: {
+    fontFamily: 'monospace',
+    fontSize: 11,
+    color: DIAL_COLORS.faint,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  reminderCountLine: {
+    marginTop: 6,
+    fontSize: 11,
+    color: DIAL_COLORS.subtext,
+    textAlign: 'center',
+  },
+  dialSection: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 16,
+  },
+  customRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  customLabel: {
+    fontFamily: 'monospace',
+    fontSize: 11,
+    color: DIAL_COLORS.subtext,
+    letterSpacing: 0.5,
+  },
+  customInput: {
+    minWidth: 56,
+    minHeight: 32,
+    paddingVertical: 4,
+    paddingHorizontal: 10,
+    borderRadius: 8,
+    backgroundColor: DIAL_COLORS.tickIdle,
+    borderWidth: 1,
+    borderColor: DIAL_COLORS.tickBorder,
+    color: DIAL_COLORS.text,
+    fontFamily: 'monospace',
+    fontSize: 13,
+    textAlign: 'center',
+  },
+  weekRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: 18,
+  },
+  weekCell: {
+    flex: 1,
+    alignItems: 'center',
+    gap: 6,
+  },
+  weekBar: {
+    alignSelf: 'stretch',
+    height: 28,
+    borderRadius: 6,
+  },
+  weekBarDone: {
+    backgroundColor: DIAL_COLORS.amber,
+  },
+  weekBarEmpty: {
+    backgroundColor: DIAL_COLORS.tickIdle,
+    borderWidth: 1,
+    borderColor: DIAL_COLORS.tickBorder,
+  },
+  weekBarToday: {
+    borderWidth: 1.5,
+    borderColor: DIAL_COLORS.amber,
+  },
+  weekLabel: {
+    fontFamily: 'monospace',
+    fontSize: 10,
+    color: DIAL_COLORS.faint,
+  },
+  weekLabelToday: {
+    color: DIAL_COLORS.amber,
+    fontWeight: '700',
+  },
+  statsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginBottom: 14,
+  },
+  panel: {
+    flex: 1,
+    minHeight: 44,
+    backgroundColor: '#141617',
+    borderRadius: 8,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  panelLabel: {
+    fontSize: 10,
+    fontWeight: '600',
+    letterSpacing: 1,
+    color: DIAL_COLORS.subtext,
+  },
+  panelValue: {
+    fontFamily: 'monospace',
+    fontWeight: '700',
+    fontSize: 20,
+    color: DIAL_COLORS.amber,
+  },
+  toggleHitArea: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  toggleTrack: {
+    width: 60,
+    height: 32,
+    borderRadius: 16,
+    justifyContent: 'center',
+  },
+  toggleKnob: {
+    position: 'absolute',
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    backgroundColor: '#ffffff',
+  },
+  breakRow: {
+    alignItems: 'flex-end',
+  },
+  breakButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    minHeight: 44,
+    paddingVertical: 10,
+    paddingHorizontal: 18,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: '#4A4D51',
+  },
+  breakButtonPressed: {
+    opacity: 0.7,
+  },
+  breakButtonText: {
+    fontFamily: 'monospace',
+    fontSize: 12,
+    fontWeight: '700',
+    letterSpacing: 1,
+    color: DIAL_COLORS.text,
+  },
+});
