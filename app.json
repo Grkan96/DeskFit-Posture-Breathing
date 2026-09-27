@@ -43,7 +43,15 @@
           "userTrackingUsageDescription": "Your device identifier is used to show you more relevant ads. You can decline and still use the app."
         }
       ],
-      "expo-status-bar"
+      "expo-status-bar",
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "kotlinVersion": "2.3.0"
+          }
+        }
+      ]
     ],
     "extra": {
       "eas": {
