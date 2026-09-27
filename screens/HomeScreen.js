@@ -14,7 +14,7 @@ import {
 import Svg, { Line, Path } from 'react-native-svg';
 import * as Haptics from 'expo-haptics';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import PostureDial, { DIAL_COLORS } from '../components/PostureDial';
+import PostureDial from '../components/PostureDial';
 import QuickBreak from '../components/QuickBreak';
 import AdBanner from '../components/AdBanner';
 import { getStats, getLast7Days } from '../lib/stats';
@@ -22,10 +22,9 @@ import { displayStreak, remainingFromTarget, countdownProgress } from '../lib/ho
 import { useThemeColors } from '../lib/theme';
 import { useTranslation } from '../lib/i18n';
 
-// "Kadran" ekranı: koyu antrasit + amber enstrüman panosu kimliği. Bu ekran
-// KASITLI olarak sistem açık/koyu tema ayarından bağımsızdır — lib/theme.js
-// buradaki kadranın kendi rengine dokunmaz (yalnızca MOLA modalindeki
-// QuickBreak akışı, kendi ekranı olduğu için, normal temayı kullanır).
+// "Kadran" ekranı: enstrüman panosu hissi (mono rakamlar, amber vurgu) ama
+// artık uygulamanın paylaşılan tema sistemini (lib/theme.js) kullanıyor, bu
+// yüzden açık/koyu mod sistem ayarına göre otomatik değişir.
 const INTERVALS = [15, 30, 45, 60];
 const MIN_MINUTES = 1;
 const MAX_CUSTOM_MINUTES = 600;
@@ -72,7 +71,7 @@ function useCountdown(isRunning, intervalMinutes, nextReminderAt) {
 }
 
 // Minimalist fincan ikonu (feather-icons "coffee" hattı) — MOLA butonunun yanında.
-function CupIcon({ size = 16, color = DIAL_COLORS.text }) {
+function CupIcon({ size = 16, color = '#000000' }) {
   return (
     <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
       <Path
@@ -97,7 +96,7 @@ function CupIcon({ size = 16, color = DIAL_COLORS.text }) {
 }
 
 // 60x32 pill toggle — mockup'taki running/duraklatıldı anahtarı.
-function RunToggle({ value, onPress, reduceMotion, accessibilityLabel, accessibilityHint }) {
+function RunToggle({ value, onPress, reduceMotion, colors, accessibilityLabel, accessibilityHint }) {
   const anim = useRef(new Animated.Value(value ? 1 : 0)).current;
   useEffect(() => {
     if (reduceMotion) {
@@ -115,7 +114,7 @@ function RunToggle({ value, onPress, reduceMotion, accessibilityLabel, accessibi
   const left = anim.interpolate({ inputRange: [0, 1], outputRange: [3, 31] });
   const trackColor = anim.interpolate({
     inputRange: [0, 1],
-    outputRange: [DIAL_COLORS.track, DIAL_COLORS.amberSoft],
+    outputRange: [colors.border, colors.accentSoft],
   });
 
   return (
@@ -135,12 +134,24 @@ function RunToggle({ value, onPress, reduceMotion, accessibilityLabel, accessibi
   );
 }
 
-// GÜN SERİ / BUGÜN gibi küçük enstrüman-panosu okuma panelleri.
-function StatPanel({ label, value, accessibilityLabel }) {
+// GÜN SERİ ve (varsa) BUGÜN okumalarını tek bir panelde, aralarında ince bir
+// ayraçla gösterir — iki ayrı kutu yerine daha sade tek bir satır.
+function StatsPanel({ streak, streakLabel, streakA11y, todayCount, todayLabel, todayA11y, colors }) {
   return (
-    <View style={styles.panel} accessible accessibilityLabel={accessibilityLabel}>
-      <Text style={styles.panelLabel}>{label}</Text>
-      <Text style={styles.panelValue}>{value}</Text>
+    <View style={[styles.panel, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+      <View style={styles.panelItem} accessible accessibilityLabel={streakA11y}>
+        <Text style={[styles.panelLabel, { color: colors.subtext }]}>{streakLabel}</Text>
+        <Text style={[styles.panelValue, { color: colors.accent }]}>{streak}</Text>
+      </View>
+      {todayCount > 0 && (
+        <>
+          <View style={[styles.panelDivider, { backgroundColor: colors.border }]} />
+          <View style={styles.panelItem} accessible accessibilityLabel={todayA11y}>
+            <Text style={[styles.panelLabel, { color: colors.subtext }]}>{todayLabel}</Text>
+            <Text style={[styles.panelValue, { color: colors.accent }]}>{todayCount}</Text>
+          </View>
+        </>
+      )}
     </View>
   );
 }
@@ -157,9 +168,7 @@ export default function HomeScreen({
   onIntervalCommit,
   nextReminderAt = null,
 }) {
-  // Sadece MOLA modalindeki QuickBreak akışı (kendi ekranı) için — kadranın
-  // kendisi bu renkleri KULLANMAZ, bkz. dosya başındaki not.
-  const themeColors = useThemeColors();
+  const colors = useThemeColors();
   const { t } = useTranslation();
   const [customText, setCustomText] = useState('');
   const [reduceMotion, setReduceMotion] = useState(false);
@@ -252,29 +261,23 @@ export default function HomeScreen({
   }));
 
   return (
-    <View style={styles.screen}>
+    <View style={[styles.screen, { backgroundColor: colors.bg }]}>
       <View
         style={[styles.content, { paddingTop: insets.top + 16, paddingBottom: insets.bottom + 10 }]}
       >
         <View style={styles.headerRow}>
           <View style={styles.statusGroup}>
             <View
-              style={[styles.dot, { backgroundColor: isRunning ? DIAL_COLORS.amber : DIAL_COLORS.faint }]}
+              style={[styles.dot, { backgroundColor: isRunning ? colors.accent : colors.faint }]}
             />
-            <Text style={styles.statusText} numberOfLines={1}>
+            <Text style={[styles.statusText, { color: colors.subtext }]} numberOfLines={1}>
               {statusLabel}
             </Text>
           </View>
-          <Text style={styles.userName} numberOfLines={1}>
+          <Text style={[styles.userName, { color: colors.faint }]} numberOfLines={1}>
             {userName}
           </Text>
         </View>
-
-        {todayReminderCount > 0 && (
-          <Text style={styles.reminderCountLine}>
-            {t('home.reminderCount', { count: todayReminderCount })}
-          </Text>
-        )}
 
         <View style={styles.dialSection}>
           <PostureDial
@@ -292,21 +295,28 @@ export default function HomeScreen({
           />
 
           <View style={styles.customRow}>
-            <Text style={styles.customLabel}>{t('home.customPlaceholder')}:</Text>
+            <Text style={[styles.customLabel, { color: colors.subtext }]}>
+              {t('home.customPlaceholder')}:
+            </Text>
             <TextInput
               value={customText}
               onChangeText={(txt) => setCustomText(txt.replace(/[^0-9]/g, ''))}
               onSubmitEditing={commitCustom}
               onBlur={() => customText && commitCustom()}
               placeholder="15–600"
-              placeholderTextColor={DIAL_COLORS.faint}
+              placeholderTextColor={colors.faint}
               keyboardType="number-pad"
               returnKeyType="done"
               accessibilityLabel={t('home.customInputLabel')}
-              style={styles.customInput}
+              style={[
+                styles.customInput,
+                { backgroundColor: colors.inputBg, borderColor: colors.border, color: colors.text },
+              ]}
               maxLength={3}
             />
-            <Text style={styles.customLabel}>{t('home.minuteUnit')}</Text>
+            <Text style={[styles.customLabel, { color: colors.subtext }]}>
+              {t('home.minuteUnit')}
+            </Text>
           </View>
         </View>
 
@@ -333,35 +343,41 @@ export default function HomeScreen({
                 <View
                   style={[
                     styles.weekBar,
-                    done ? styles.weekBarDone : styles.weekBarEmpty,
-                    isToday && styles.weekBarToday,
+                    done
+                      ? { backgroundColor: colors.accent }
+                      : { backgroundColor: colors.inputBg, borderWidth: 1, borderColor: colors.border },
+                    isToday && { borderWidth: 1.5, borderColor: colors.accent },
                   ]}
                 />
-                <Text style={[styles.weekLabel, isToday && styles.weekLabelToday]}>{name}</Text>
+                <Text
+                  style={[
+                    styles.weekLabel,
+                    { color: isToday ? colors.accent : colors.faint },
+                    isToday && styles.weekLabelToday,
+                  ]}
+                >
+                  {name}
+                </Text>
               </View>
             );
           })}
         </View>
 
         <View style={styles.statsRow}>
-          <StatPanel
-            label={t('home.streakPanelLabel')}
-            value={streak}
-            accessibilityLabel={
-              streak > 0 ? t('home.streakA11y', { count: streak }) : t('home.streakNone')
-            }
+          <StatsPanel
+            streak={streak}
+            streakLabel={t('home.streakPanelLabel')}
+            streakA11y={streak > 0 ? t('home.streakA11y', { count: streak }) : t('home.streakNone')}
+            todayCount={todayReminderCount}
+            todayLabel={t('home.todayPanelLabel')}
+            todayA11y={t('home.reminderCount', { count: todayReminderCount })}
+            colors={colors}
           />
-          {todayReminderCount > 0 && (
-            <StatPanel
-              label={t('home.todayPanelLabel')}
-              value={todayReminderCount}
-              accessibilityLabel={t('home.reminderCount', { count: todayReminderCount })}
-            />
-          )}
           <RunToggle
             value={isRunning}
             onPress={handleToggle}
             reduceMotion={reduceMotion}
+            colors={colors}
             accessibilityLabel={isRunning ? t('home.stop') : t('home.start')}
             accessibilityHint={isRunning ? t('home.stopHint') : t('home.startHint')}
           />
@@ -373,10 +389,16 @@ export default function HomeScreen({
             accessibilityRole="button"
             accessibilityLabel={t('home.breakNow')}
             accessibilityHint={t('home.breakNowHint')}
-            style={({ pressed }) => [styles.breakButton, pressed && styles.breakButtonPressed]}
+            style={({ pressed }) => [
+              styles.breakButton,
+              { borderColor: colors.borderStrong },
+              pressed && styles.breakButtonPressed,
+            ]}
           >
-            <CupIcon size={15} color={DIAL_COLORS.text} />
-            <Text style={styles.breakButtonText}>{t('home.breakShortLabel')}</Text>
+            <CupIcon size={15} color={colors.text} />
+            <Text style={[styles.breakButtonText, { color: colors.text }]}>
+              {t('home.breakShortLabel')}
+            </Text>
           </Pressable>
         </View>
       </View>
@@ -389,7 +411,7 @@ export default function HomeScreen({
         <View
           style={{
             flex: 1,
-            backgroundColor: themeColors.bg,
+            backgroundColor: colors.bg,
             paddingTop: insets.top,
             paddingBottom: insets.bottom,
           }}
@@ -406,7 +428,6 @@ export default function HomeScreen({
 const styles = StyleSheet.create({
   screen: {
     flex: 1,
-    backgroundColor: DIAL_COLORS.bg,
   },
   content: {
     flex: 1,
@@ -433,22 +454,14 @@ const styles = StyleSheet.create({
     fontFamily: 'monospace',
     fontSize: 11,
     fontWeight: '600',
-    letterSpacing: 1.2,
-    color: DIAL_COLORS.subtext,
+    letterSpacing: 0.8,
     flexShrink: 1,
   },
   userName: {
     fontFamily: 'monospace',
     fontSize: 11,
-    color: DIAL_COLORS.faint,
     textTransform: 'uppercase',
     letterSpacing: 0.5,
-  },
-  reminderCountLine: {
-    marginTop: 6,
-    fontSize: 11,
-    color: DIAL_COLORS.subtext,
-    textAlign: 'center',
   },
   dialSection: {
     flex: 1,
@@ -464,7 +477,6 @@ const styles = StyleSheet.create({
   customLabel: {
     fontFamily: 'monospace',
     fontSize: 11,
-    color: DIAL_COLORS.subtext,
     letterSpacing: 0.5,
   },
   customInput: {
@@ -473,10 +485,7 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
     paddingHorizontal: 10,
     borderRadius: 8,
-    backgroundColor: DIAL_COLORS.tickIdle,
     borderWidth: 1,
-    borderColor: DIAL_COLORS.tickBorder,
-    color: DIAL_COLORS.text,
     fontFamily: 'monospace',
     fontSize: 13,
     textAlign: 'center',
@@ -496,25 +505,11 @@ const styles = StyleSheet.create({
     height: 28,
     borderRadius: 6,
   },
-  weekBarDone: {
-    backgroundColor: DIAL_COLORS.amber,
-  },
-  weekBarEmpty: {
-    backgroundColor: DIAL_COLORS.tickIdle,
-    borderWidth: 1,
-    borderColor: DIAL_COLORS.tickBorder,
-  },
-  weekBarToday: {
-    borderWidth: 1.5,
-    borderColor: DIAL_COLORS.amber,
-  },
   weekLabel: {
     fontFamily: 'monospace',
     fontSize: 10,
-    color: DIAL_COLORS.faint,
   },
   weekLabelToday: {
-    color: DIAL_COLORS.amber,
     fontWeight: '700',
   },
   statsRow: {
@@ -526,25 +521,33 @@ const styles = StyleSheet.create({
   panel: {
     flex: 1,
     minHeight: 44,
-    backgroundColor: '#141617',
     borderRadius: 8,
+    borderWidth: 1,
     paddingVertical: 12,
     paddingHorizontal: 14,
     flexDirection: 'row',
     alignItems: 'center',
+  },
+  panelItem: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
     justifyContent: 'space-between',
+  },
+  panelDivider: {
+    width: 1,
+    height: '70%',
+    marginHorizontal: 14,
   },
   panelLabel: {
     fontSize: 10,
     fontWeight: '600',
-    letterSpacing: 1,
-    color: DIAL_COLORS.subtext,
+    letterSpacing: 0.6,
   },
   panelValue: {
     fontFamily: 'monospace',
     fontWeight: '700',
     fontSize: 20,
-    color: DIAL_COLORS.amber,
   },
   toggleHitArea: {
     alignItems: 'center',
@@ -562,6 +565,7 @@ const styles = StyleSheet.create({
     height: 26,
     borderRadius: 13,
     backgroundColor: '#ffffff',
+    left: 3,
   },
   breakRow: {
     alignItems: 'flex-end',
@@ -575,7 +579,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 18,
     borderRadius: 20,
     borderWidth: 1,
-    borderColor: '#4A4D51',
   },
   breakButtonPressed: {
     opacity: 0.7,
@@ -584,7 +587,6 @@ const styles = StyleSheet.create({
     fontFamily: 'monospace',
     fontSize: 12,
     fontWeight: '700',
-    letterSpacing: 1,
-    color: DIAL_COLORS.text,
+    letterSpacing: 0.6,
   },
 });

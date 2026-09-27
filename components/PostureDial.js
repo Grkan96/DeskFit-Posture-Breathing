@@ -1,23 +1,9 @@
 import { useEffect, useRef } from 'react';
 import { Animated, Easing, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import Svg, { Circle } from 'react-native-svg';
+import { useThemeColors } from '../lib/theme';
 
 const AnimatedCircle = Animated.createAnimatedComponent(Circle);
-
-// "Kadran" enstrüman panosu paleti — bu ekran KASITLI olarak sistem
-// açık/koyu temasından bağımsızdır (bkz. HomeScreen.js), bu yüzden renkler
-// burada sabit tutulur (lib/theme.js kullanılmaz).
-export const DIAL_COLORS = {
-  bg: '#1B1D1F',
-  track: '#2A2D30',
-  amber: '#F2A64B',
-  amberSoft: '#5C4423',
-  text: '#EDEAE3',
-  subtext: '#9A9DA1',
-  faint: '#6E7175',
-  tickIdle: '#222426',
-  tickBorder: '#3A3D41',
-};
 
 // Kadran çevresinde 4 tik konumu: üst / sağ / alt / sol (saat 12/3/6/9 hissi).
 const TICK_ANGLES_DEG = [-90, 0, 90, 180];
@@ -39,6 +25,7 @@ export default function PostureDial({
   tickSize = 46,
   centerAccessibilityLabel,
 }) {
+  const colors = useThemeColors();
   const radius = (size - strokeWidth) / 2;
   const cx = size / 2;
   const cy = size / 2;
@@ -72,7 +59,7 @@ export default function PostureDial({
           cx={cx}
           cy={cy}
           r={radius}
-          stroke={DIAL_COLORS.track}
+          stroke={colors.border}
           strokeWidth={strokeWidth}
           fill="none"
         />
@@ -80,7 +67,7 @@ export default function PostureDial({
           cx={cx}
           cy={cy}
           r={radius}
-          stroke={DIAL_COLORS.amber}
+          stroke={colors.accent}
           strokeWidth={strokeWidth}
           fill="none"
           strokeLinecap="round"
@@ -97,11 +84,11 @@ export default function PostureDial({
         accessible
         accessibilityLabel={centerAccessibilityLabel || `${centerLabel || ''} ${centerValue || ''}`.trim()}
       >
-        <Text style={styles.value} importantForAccessibility="no">
+        <Text style={[styles.value, { color: colors.text }]} importantForAccessibility="no">
           {centerValue}
         </Text>
         {centerLabel ? (
-          <Text style={styles.label} importantForAccessibility="no">
+          <Text style={[styles.label, { color: colors.subtext }]} importantForAccessibility="no">
             {centerLabel}
           </Text>
         ) : null}
@@ -129,11 +116,18 @@ export default function PostureDial({
                 left: tickCx - tickSize / 2,
                 top: tickCy - tickSize / 2,
               },
-              item.selected ? styles.tickSelected : styles.tickIdle,
+              item.selected
+                ? { backgroundColor: colors.accent, borderColor: colors.accent }
+                : { backgroundColor: colors.surface, borderColor: colors.border },
               pressed && styles.tickPressed,
             ]}
           >
-            <Text style={[styles.tickText, item.selected && styles.tickTextSelected]}>
+            <Text
+              style={[
+                styles.tickText,
+                { color: item.selected ? colors.onAccent : colors.text },
+              ]}
+            >
               {item.minutes}
             </Text>
           </Pressable>
@@ -154,7 +148,6 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     fontSize: 44,
     letterSpacing: -1,
-    color: DIAL_COLORS.text,
     fontVariant: ['tabular-nums'],
     textAlign: 'center',
   },
@@ -163,7 +156,6 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontWeight: '600',
     letterSpacing: 1.5,
-    color: DIAL_COLORS.subtext,
     textAlign: 'center',
     textTransform: 'uppercase',
   },
@@ -173,14 +165,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     borderWidth: 1,
   },
-  tickIdle: {
-    backgroundColor: DIAL_COLORS.tickIdle,
-    borderColor: DIAL_COLORS.tickBorder,
-  },
-  tickSelected: {
-    backgroundColor: DIAL_COLORS.amber,
-    borderColor: DIAL_COLORS.amber,
-  },
   tickPressed: {
     opacity: 0.8,
     transform: [{ scale: 0.95 }],
@@ -189,9 +173,5 @@ const styles = StyleSheet.create({
     fontFamily: MONO_FONT,
     fontSize: 13,
     fontWeight: '700',
-    color: DIAL_COLORS.text,
-  },
-  tickTextSelected: {
-    color: DIAL_COLORS.bg,
   },
 });
