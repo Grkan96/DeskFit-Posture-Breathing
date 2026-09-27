@@ -9,7 +9,8 @@ import QuickBreak from '../components/QuickBreak';
 import { getStats, startPostureChallenge } from '../lib/stats';
 import { CHALLENGE_DAYS } from '../lib/challenge';
 import { TECHNIQUES } from '../lib/breathingTechniques';
-import { pickSuggestion } from '../lib/sessionContent';
+import { pickSuggestion, MOVEMENT_META, EXERCISE_META } from '../lib/sessionContent';
+import { loadProfile } from '../lib/onboardingProfile';
 import { useThemeColors } from '../lib/theme';
 import { useTranslation } from '../lib/i18n';
 
@@ -43,15 +44,22 @@ export default function MeditationScreen({ onChangeTab }) {
   const { t } = useTranslation();
   const [activeSession, setActiveSession] = useState(null);
   const [stats, setStats] = useState(null);
+  const [painArea, setPainArea] = useState(null);
 
   useEffect(() => {
     if (activeSession === null) {
       getStats().then(setStats);
+      loadProfile().then((profile) => setPainArea(profile && profile.painArea));
     }
   }, [activeSession]);
 
-  // "Bugünün önerisi": en az yapılan tür (eşitlikte güne göre döner).
-  const suggestion = pickSuggestion(stats && stats.byType, new Date(), TECHNIQUES.length);
+  // "Bugünün önerisi": ağrı bölgesi varsa ona uygun hareket, yoksa en az
+  // yapılan tür (eşitlikte güne göre döner).
+  const suggestion = pickSuggestion(stats && stats.byType, new Date(), TECHNIQUES.length, painArea);
+  const suggestionMeta = suggestion.matchedId
+    ? (MOVEMENT_META.find((m) => m.id === suggestion.matchedId) ||
+        EXERCISE_META.find((m) => m.id === suggestion.matchedId))
+    : null;
   const challenge = stats && stats.challenge;
   const back = () => setActiveSession(null);
 
@@ -149,9 +157,16 @@ export default function MeditationScreen({ onChangeTab }) {
           icon="🎯"
           ready
           title={t('meditation.suggestionTitle')}
-          description={t('meditation.suggestionBody', {
-            name: t(`meditation.categories.${suggestion.type}.title`),
-          })}
+          description={
+            suggestion.personalized && suggestionMeta
+              ? t('meditation.suggestionPersonalizedBody', {
+                  name: t(`${suggestion.type}.items.${suggestion.matchedId}.title`),
+                  pain: t(`onboardingFlow.questions.pain.${painArea}`),
+                })
+              : t('meditation.suggestionBody', {
+                  name: t(`meditation.categories.${suggestion.type}.title`),
+                })
+          }
           badgeLabel={t('meditation.badgeReady')}
           onPress={() => setActiveSession(`suggest-${suggestion.type}`)}
         />
