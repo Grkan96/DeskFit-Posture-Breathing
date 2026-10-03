@@ -66,9 +66,11 @@
         "expo-audio",
         {
           "microphonePermission": false,
-          "recordAudioAndroid": false
+          "recordAudioAndroid": false,
+          "enableBackgroundPlayback": false
         }
-      ]
+      ],
+      "./plugins/withoutUnusedAndroidPermissions.js"
     ],
     "extra": {
       "eas": {
