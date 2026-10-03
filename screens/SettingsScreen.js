@@ -23,6 +23,13 @@ import { useTranslation } from '../lib/i18n';
 import { shareApp } from '../lib/sharing';
 import ShareCard from '../components/ShareCard';
 
+// TODO(gurkan): GitHub Pages (veya başka bir statik barındırma) üzerinde
+// docs/privacy-policy.html yayına alındığında buraya gerçek URL'i yaz.
+// Boşken aşağıdaki satır sadece uygulama içi kısa özeti (Alert) gösterir;
+// Play Console mağaza listeleme formu için ayrıca HOST EDİLMİŞ bir URL
+// gerekir (bkz. docs/PLAY_STORE_SUBMISSION.md).
+const PRIVACY_POLICY_URL = null;
+
 const THEME_MODES = [
   { key: 'system', labelKey: 'settings.themeSystem', icon: '🌓' },
   { key: 'light', labelKey: 'settings.themeLight', icon: '☀️' },
@@ -524,7 +531,15 @@ export default function SettingsScreen({
         )}
 
         <Pressable
-          onPress={() => Alert.alert(t('settings.privacyTitle'), t('settings.privacyText'))}
+          onPress={() => {
+            if (PRIVACY_POLICY_URL) {
+              Linking.openURL(PRIVACY_POLICY_URL).catch(() =>
+                Alert.alert(t('settings.privacyTitle'), t('settings.privacyText'))
+              );
+            } else {
+              Alert.alert(t('settings.privacyTitle'), t('settings.privacyText'));
+            }
+          }}
           style={styles.linkRow}
         >
           <Text style={styles.linkText}>{t('settings.privacyLink')}</Text>
