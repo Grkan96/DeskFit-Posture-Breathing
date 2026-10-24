@@ -48,7 +48,7 @@ Employés de bureau, travailleurs à distance, étudiants, joueurs, développeur
 
 POURQUOI LES PETITES PAUSES FONCTIONNENT
 
-Rester assis sans bouger pendant longtemps est difficile pour le cou, les épaules et le bas du dos. De courtes pauses de mouvement régulières et le fait de détourner le regard de l'écran sont des habitudes simples et largement recommandées pour une journée de travail plus confortable. Posture & Pause Visuelle rend ces habitudes automatiques, sans configuration compliquée ni compte.
+Rester assis sans bouger pendant longtemps est difficile pour le cou, les épaules et le bas du dos. De courtes pauses de mouvement régulières et le fait de détourner le regard de l'écran sont des habitudes simples et efficaces pour une journée de travail confortable. Posture & Pause Visuelle rend ces habitudes automatiques, sans configuration ni compte.
 
 COMMENT ÇA MARCHE
 
