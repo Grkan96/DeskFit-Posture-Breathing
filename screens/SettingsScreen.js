@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   AccessibilityInfo,
   Alert,
@@ -21,6 +21,7 @@ import appConfig from '../app.json';
 import { useThemeColors, useThemePreference, radius } from '../lib/theme';
 import { useTranslation } from '../lib/i18n';
 import { shareApp } from '../lib/sharing';
+import { copyShareLink } from '../lib/referral';
 import ShareCard from '../components/ShareCard';
 
 // GitHub Pages (main dalındaki docs/ klasörü) üzerinde yayınlanan gizlilik
@@ -201,6 +202,8 @@ export default function SettingsScreen({
   const [reduceMotion, setReduceMotion] = useState(false);
   const [notifDenied, setNotifDenied] = useState(false);
   const [privacyOptionsRequired, setPrivacyOptionsRequired] = useState(false);
+  const [linkCopied, setLinkCopied] = useState(false);
+  const copyResetTimer = useRef(null);
 
   const isOpen = (id) => !!openSections[id];
 
@@ -267,6 +270,38 @@ export default function SettingsScreen({
     } else {
       setNameText(userName);
     }
+  }
+
+  useEffect(() => {
+    return () => {
+      if (copyResetTimer.current) clearTimeout(copyResetTimer.current);
+    };
+  }, []);
+
+  // Davet linkini panoya kopyalar. Onay, göz yormaması için Alert yerine kısa
+  // ömürlü bir metin olarak gösterilir (2 sn sonra kaybolur). Kopyalama bir
+  // paylaşım gibi sayılıp davet rozetine katkı yaparsa (bkz. lib/referral.js
+  // copyShareLink), mevcut ödül Alert'i aynen gösterilir.
+  async function onCopyInviteLink() {
+    const result = await copyShareLink('settings');
+    if (!result.copied) return;
+    setLinkCopied(true);
+    if (copyResetTimer.current) clearTimeout(copyResetTimer.current);
+    copyResetTimer.current = setTimeout(() => setLinkCopied(false), 2000);
+    if (result.shareState && result.shareState.rewarded) {
+      Alert.alert(
+        t('referral.rewardTitle'),
+        t('referral.rewardBody', { count: result.shareState.count, rewards: result.shareState.rewards })
+      );
+    }
+  }
+
+  // Widget'ı programatik olarak ekleyemeyiz (Android'de buna izin veren bir API
+  // yok) — bu sadece adım adım talimat gösteren bilgilendirici bir satır.
+  // Expo Go'da widget native modülü mevcut değildir, ama bu satır orada da
+  // görünür ve aynı talimatı gösterir (zararsız, salt bilgi amaçlı).
+  function onWidgetInfoPress() {
+    Alert.alert(t('settings.widgetAlertTitle'), t('settings.widgetAlertBody'));
   }
 
   return (
@@ -497,8 +532,40 @@ export default function SettingsScreen({
         onToggle={() => toggleSection('share')}
         reduceMotion={reduceMotion}
       >
-        <Pressable onPress={shareApp} style={styles.shareButton}>
+        <Pressable
+          onPress={shareApp}
+          accessibilityRole="button"
+          accessibilityLabel={t('settings.shareButton')}
+          style={styles.shareButton}
+        >
           <Text style={styles.shareButtonText}>{t('settings.shareButton')}</Text>
+        </Pressable>
+
+        <Pressable
+          onPress={onCopyInviteLink}
+          accessibilityRole="button"
+          accessibilityLabel={t('referral.copyLink')}
+          style={styles.copyButton}
+        >
+          <Text style={styles.copyButtonText}>{t('referral.copyLink')}</Text>
+        </Pressable>
+        {linkCopied && (
+          <Text style={styles.copyConfirmText} accessibilityLiveRegion="polite">
+            {t('referral.copied')}
+          </Text>
+        )}
+
+        <Pressable
+          onPress={onWidgetInfoPress}
+          accessibilityRole="button"
+          accessibilityLabel={t('settings.widgetTitle')}
+          style={styles.widgetRow}
+        >
+          <Text style={styles.widgetRowIcon}>📱</Text>
+          <View style={styles.settingTextBlock}>
+            <Text style={styles.settingLabel}>{t('settings.widgetTitle')}</Text>
+            <Text style={styles.settingHint}>{t('settings.widgetHint')}</Text>
+          </View>
         </Pressable>
 
         <ShareCard />
@@ -776,6 +843,42 @@ function createStyles(colors) {
       fontSize: 13,
       fontWeight: '700',
       color: colors.accentText,
+    },
+    copyButton: {
+      marginTop: 10,
+      minHeight: 44,
+      justifyContent: 'center',
+      alignItems: 'center',
+      paddingVertical: 12,
+      borderRadius: radius.lg,
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+    copyButtonText: {
+      fontSize: 13,
+      fontWeight: '700',
+      color: colors.text,
+    },
+    copyConfirmText: {
+      marginTop: 6,
+      fontSize: 12,
+      fontWeight: '700',
+      color: colors.accentText,
+      textAlign: 'center',
+    },
+    widgetRow: {
+      marginTop: 12,
+      minHeight: 44,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 12,
+      paddingVertical: 12,
+      paddingHorizontal: 14,
+      borderRadius: radius.lg,
+      backgroundColor: colors.inputBg,
+    },
+    widgetRowIcon: {
+      fontSize: 20,
     },
     linkRow: {
       minHeight: 44,
