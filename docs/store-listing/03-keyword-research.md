@@ -42,3 +42,21 @@ Our differentiator: the only one combining posture + eye + stretch + breathing +
 
 1. Week 1: pull Play Console "Search terms" and Apple "Search Terms" data; move winning terms into the title/subtitle.
 2. Re-test title variants with Play Store listing experiments (title cannot be experimented; use short desc, icon, screenshots).
+
+## Other locale keywords (added for ASO store-listing localization, es/de/pt/fr/ru/hi/id)
+
+Plain term lists only — no competition/volume estimate (same caveat as above: validate with AppFollow/Sensor Tower/AppTweak/Play Console search-term reports after launch).
+
+**Spanish (es):** postura, dolor de espalda, pausas activas, pausa visual, ergonomía, regla 20-20-20, estiramientos de oficina, racha de hábito
+
+**German (de):** Haltung, Rückenschmerzen, Augenpause, Nackenschmerzen, Ergonomie, 20-20-20-Regel, Büro-Dehnübungen, Bildschirmpause
+
+**Portuguese (pt):** postura, dor nas costas, pausa para os olhos, dor no pescoço, ergonomia, regra 20-20-20, alongamento no trabalho, sequência de hábito
+
+**French (fr):** posture, mal de dos, pause visuelle, ergonomie, règle du 20-20-20, étirements de bureau, douleur au cou, série/streak
+
+**Russian (ru):** осанка, боль в спине, отдых для глаз, боль в шее, эргономика, правило 20-20-20, офисная разминка, привычка/серия
+
+**Hindi (hi):** पोश्चर (posture), back pain, मुद्रा, आँखों का आराम, 20-20-20 rule, ऑफिस स्ट्रेचिंग, गर्दन का दर्द, स्ट्रीक — note: Indian search behavior mixes Devanagari and English/Hinglish terms (e.g. "posture reminder app", "back pain exercise" typed directly in Latin script even on the Hindi locale), so ASA/organic keyword lists for India should include both scripts.
+
+**Indonesian (id):** postur tubuh, sakit punggung, istirahat mata, sakit leher, ergonomi, aturan 20-20-20, peregangan kantor, pengingat kebiasaan
