@@ -1,9 +1,32 @@
-import { useState } from 'react';
-import { Alert, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
+import { useCallback, useEffect, useState } from 'react';
+import {
+  AccessibilityInfo,
+  Alert,
+  AppState,
+  Linking,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Switch,
+  Text,
+  TextInput,
+  View,
+} from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as Notifications from 'expo-notifications';
 import AdBanner from '../components/AdBanner';
-import { useThemeColors, useThemePreference } from '../lib/theme';
+import SettingsSection from '../components/SettingsSection';
+import { isPrivacyOptionsRequired, showPrivacyOptions } from '../lib/consent';
+import appConfig from '../app.json';
+import { useThemeColors, useThemePreference, radius } from '../lib/theme';
 import { useTranslation } from '../lib/i18n';
 import { shareApp } from '../lib/sharing';
+import ShareCard from '../components/ShareCard';
+
+// GitHub Pages (main dalındaki docs/ klasörü) üzerinde yayınlanan gizlilik
+// politikası. İçeriği güncel tutmak için docs/privacy-policy.html'in en son
+// hâli main'e birleşmiş olmalı (bkz. worktree-privacy-policy-pages PR'ı).
+const PRIVACY_POLICY_URL = 'https://grkan96.github.io/DeskFit-Posture-Breathing/privacy-policy.html';
 
 const THEME_MODES = [
   { key: 'system', labelKey: 'settings.themeSystem', icon: '🌓' },
@@ -14,6 +37,13 @@ const THEME_MODES = [
 const LANGUAGE_MODES = [
   { key: 'tr', label: 'Türkçe' },
   { key: 'en', label: 'English' },
+  { key: 'es', label: 'Español' },
+  { key: 'de', label: 'Deutsch' },
+  { key: 'pt', label: 'Português' },
+  { key: 'fr', label: 'Français' },
+  { key: 'ru', label: 'Русский' },
+  { key: 'hi', label: 'हिन्दी' },
+  { key: 'id', label: 'Indonesia' },
 ];
 
 const ALERT_MODES = [
@@ -32,9 +62,37 @@ function formatHour(hour) {
   return `${String(hour).padStart(2, '0')}:00`;
 }
 
-function SegmentedControl({ styles, options, value, onChange, t }) {
+// Date#getDay() değerleri, Pazartesi ile başlayan görüntü sırasına göre.
+const WEEK_ORDER = [1, 2, 3, 4, 5, 6, 0];
+const WEEKDAYS_ONLY = [1, 2, 3, 4, 5];
+
+function formatMinutes(minutes) {
+  const h = String(Math.floor(minutes / 60)).padStart(2, '0');
+  const m = String(minutes % 60).padStart(2, '0');
+  return `${h}:${m}`;
+}
+
+const SECTIONS_KEY = 'settings.sections.v1';
+const DEFAULT_OPEN = { reminder: true, appearance: false, share: false, about: false };
+
+function NotificationDeniedHint({ styles, t }) {
   return (
-    <View style={styles.segmentRow}>
+    <View style={styles.deniedBox}>
+      <Text style={styles.deniedText}>{t('settings.notifDeniedHint')}</Text>
+      <Pressable
+        onPress={() => Linking.openSettings().catch(() => {})}
+        accessibilityRole="button"
+        style={styles.quickButton}
+      >
+        <Text style={styles.quickButtonText}>{t('settings.notifOpenSettings')}</Text>
+      </Pressable>
+    </View>
+  );
+}
+
+function SegmentedControl({ styles, options, value, onChange, t, wrap }) {
+  return (
+    <View style={[styles.segmentRow, wrap && styles.segmentRowWrap]}>
       {options.map((option) => {
         const selected = option.key === value;
         const label = option.labelKey ? t(option.labelKey) : option.label;
@@ -45,7 +103,7 @@ function SegmentedControl({ styles, options, value, onChange, t }) {
             accessibilityRole="button"
             accessibilityState={{ selected }}
             accessibilityLabel={label}
-            style={[styles.segment, selected && styles.segmentSelected]}
+            style={[styles.segment, wrap && styles.segmentWrap, selected && styles.segmentSelected]}
           >
             {option.icon && (
               <Text style={styles.segmentIcon}>{option.icon}</Text>
@@ -85,6 +143,31 @@ function HourStepper({ styles, label, hour, onChange }) {
   );
 }
 
+function TimeStepper({ styles, label, minutes, onChange }) {
+  return (
+    <View style={styles.stepperRow}>
+      <Text style={styles.stepperLabel}>{label}</Text>
+      <View style={styles.stepperControl}>
+        <Pressable
+          onPress={() => onChange((minutes + 1440 - 30) % 1440)}
+          style={styles.stepperButton}
+          hitSlop={8}
+        >
+          <Text style={styles.stepperButtonText}>–</Text>
+        </Pressable>
+        <Text style={styles.stepperValue}>{formatMinutes(minutes)}</Text>
+        <Pressable
+          onPress={() => onChange((minutes + 30) % 1440)}
+          style={styles.stepperButton}
+          hitSlop={8}
+        >
+          <Text style={styles.stepperButtonText}>+</Text>
+        </Pressable>
+      </View>
+    </View>
+  );
+}
+
 export default function SettingsScreen({
   userName,
   onNameChange,
@@ -101,12 +184,81 @@ export default function SettingsScreen({
   eyeRestEnabled,
   onEyeRestToggle,
   onTestNotification,
+  workSchedule,
+  onWorkScheduleChange,
+  streakAlert,
+  onStreakAlertChange,
 }) {
   const colors = useThemeColors();
   const styles = createStyles(colors);
   const { t, locale, setLocale } = useTranslation();
   const [themePreference, setThemePreference] = useThemePreference();
   const [nameText, setNameText] = useState(userName);
+
+  const weekdays = t('settings.weekdaysShort');
+
+  const [openSections, setOpenSections] = useState(DEFAULT_OPEN);
+  const [reduceMotion, setReduceMotion] = useState(false);
+  const [notifDenied, setNotifDenied] = useState(false);
+  const [privacyOptionsRequired, setPrivacyOptionsRequired] = useState(false);
+
+  const isOpen = (id) => !!openSections[id];
+
+  function toggleSection(id) {
+    setOpenSections((prev) => {
+      const next = { ...prev, [id]: !prev[id] };
+      AsyncStorage.setItem(
+        SECTIONS_KEY,
+        JSON.stringify({ open: next, last: next[id] ? id : null })
+      ).catch(() => {});
+      return next;
+    });
+  }
+
+  useEffect(() => {
+    let mounted = true;
+    AsyncStorage.getItem(SECTIONS_KEY)
+      .then((raw) => {
+        if (!mounted || !raw) return;
+        const parsed = JSON.parse(raw);
+        if (parsed && typeof parsed.open === 'object' && parsed.open) {
+          setOpenSections({ ...DEFAULT_OPEN, ...parsed.open });
+        }
+      })
+      .catch(() => {});
+    AccessibilityInfo.isReduceMotionEnabled()
+      .then((v) => mounted && setReduceMotion(!!v))
+      .catch(() => {});
+    const sub = AccessibilityInfo.addEventListener('reduceMotionChanged', (v) => setReduceMotion(!!v));
+    isPrivacyOptionsRequired()
+      .then((v) => mounted && setPrivacyOptionsRequired(!!v))
+      .catch(() => {});
+    return () => {
+      mounted = false;
+      sub?.remove?.();
+    };
+  }, []);
+
+  const refreshNotifPermission = useCallback(() => {
+    Notifications.getPermissionsAsync()
+      .then((p) => setNotifDenied(!p.granted && p.status === 'denied'))
+      .catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    refreshNotifPermission();
+    const sub = AppState.addEventListener('change', (s) => {
+      if (s === 'active') refreshNotifPermission();
+    });
+    return () => sub.remove();
+  }, [refreshNotifPermission]);
+
+  function toggleWorkDay(day) {
+    const days = workSchedule.days.includes(day)
+      ? workSchedule.days.filter((d) => d !== day)
+      : [...workSchedule.days, day];
+    onWorkScheduleChange({ ...workSchedule, days });
+  }
 
   function commitName() {
     const trimmed = nameText.trim();
@@ -121,7 +273,7 @@ export default function SettingsScreen({
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       <Text style={styles.header}>{t('settings.header')}</Text>
 
-      <View style={styles.card}>
+      <View style={styles.nameCard}>
         <Text style={styles.settingLabel}>{t('settings.nameLabel')}</Text>
         <TextInput
           value={nameText}
@@ -136,29 +288,14 @@ export default function SettingsScreen({
         />
       </View>
 
-      <View style={styles.card}>
-        <Text style={styles.settingLabel}>{t('settings.appearanceLabel')}</Text>
-        <SegmentedControl
-          styles={styles}
-          options={THEME_MODES}
-          value={themePreference}
-          onChange={setThemePreference}
-          t={t}
-        />
-      </View>
-
-      <View style={styles.card}>
-        <Text style={styles.settingLabel}>{t('settings.languageLabel')}</Text>
-        <SegmentedControl
-          styles={styles}
-          options={LANGUAGE_MODES}
-          value={locale}
-          onChange={setLocale}
-          t={t}
-        />
-      </View>
-
-      <View style={styles.card}>
+      <SettingsSection
+        title={t('settings.sectionReminder')}
+        icon="🔔"
+        open={isOpen('reminder')}
+        onToggle={() => toggleSection('reminder')}
+        reduceMotion={reduceMotion}
+      >
+      <View style={[styles.card, styles.cardFirst]}>
         <Text style={styles.settingLabel}>{t('settings.alertModeLabel')}</Text>
         <SegmentedControl
           styles={styles}
@@ -213,6 +350,97 @@ export default function SettingsScreen({
       <View style={styles.card}>
         <View style={styles.cardRow}>
           <View style={styles.settingTextBlock}>
+            <Text style={styles.settingLabel}>{t('settings.workScheduleLabel')}</Text>
+            <Text style={styles.settingHint}>{t('settings.workScheduleHint')}</Text>
+          </View>
+          <Switch
+            value={workSchedule.enabled}
+            onValueChange={(enabled) => onWorkScheduleChange({ ...workSchedule, enabled })}
+            trackColor={{ false: colors.borderStrong, true: colors.accentSoft }}
+            thumbColor={workSchedule.enabled ? colors.accent : colors.inputBg}
+          />
+        </View>
+        {workSchedule.enabled && (
+          <View style={styles.steppersBlock}>
+            <View style={styles.dayRow}>
+              {WEEK_ORDER.map((day, i) => {
+                const selected = workSchedule.days.includes(day);
+                return (
+                  <Pressable
+                    key={day}
+                    onPress={() => toggleWorkDay(day)}
+                    accessibilityRole="button"
+                    accessibilityState={{ selected }}
+                    accessibilityLabel={weekdays[i]}
+                    style={[styles.dayChip, selected && styles.segmentSelected]}
+                  >
+                    <Text style={[styles.segmentText, selected && styles.segmentTextSelected]}>
+                      {weekdays[i]}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+            {workSchedule.days.length === 0 && (
+              <Text
+                style={styles.warningText}
+                accessibilityRole="alert"
+                accessibilityLiveRegion="polite"
+              >
+                {t('settings.workDaysEmptyWarning')}
+              </Text>
+            )}
+            <Pressable
+              onPress={() => onWorkScheduleChange({ ...workSchedule, days: WEEKDAYS_ONLY })}
+              style={styles.quickButton}
+            >
+              <Text style={styles.quickButtonText}>{t('settings.workWeekdaysOnly')}</Text>
+            </Pressable>
+            <HourStepper
+              styles={styles}
+              label={t('settings.workStartLabel')}
+              hour={workSchedule.start}
+              onChange={(start) => onWorkScheduleChange({ ...workSchedule, start })}
+            />
+            <HourStepper
+              styles={styles}
+              label={t('settings.workEndLabel')}
+              hour={workSchedule.end}
+              onChange={(end) => onWorkScheduleChange({ ...workSchedule, end })}
+            />
+          </View>
+        )}
+      </View>
+
+      <View style={styles.card}>
+        <View style={styles.cardRow}>
+          <View style={styles.settingTextBlock}>
+            <Text style={styles.settingLabel}>{t('settings.streakAlertLabel')}</Text>
+            <Text style={styles.settingHint}>{t('settings.streakAlertHint')}</Text>
+          </View>
+          <Switch
+            value={streakAlert.enabled}
+            onValueChange={(enabled) => onStreakAlertChange({ ...streakAlert, enabled })}
+            trackColor={{ false: colors.borderStrong, true: colors.accentSoft }}
+            thumbColor={streakAlert.enabled ? colors.accent : colors.inputBg}
+          />
+        </View>
+        {notifDenied && <NotificationDeniedHint styles={styles} t={t} />}
+        {streakAlert.enabled && (
+          <View style={styles.steppersBlock}>
+            <TimeStepper
+              styles={styles}
+              label={t('settings.streakAlertTimeLabel')}
+              minutes={streakAlert.minutes}
+              onChange={(minutes) => onStreakAlertChange({ ...streakAlert, minutes })}
+            />
+          </View>
+        )}
+      </View>
+
+      <View style={styles.card}>
+        <View style={styles.cardRow}>
+          <View style={styles.settingTextBlock}>
             <Text style={styles.settingLabel}>{t('settings.eyeRestLabel')}</Text>
             <Text style={styles.settingHint}>{t('settings.eyeRestHint')}</Text>
           </View>
@@ -223,22 +451,98 @@ export default function SettingsScreen({
             thumbColor={eyeRestEnabled ? colors.accent : colors.inputBg}
           />
         </View>
+        {notifDenied && <NotificationDeniedHint styles={styles} t={t} />}
       </View>
 
       <Pressable onPress={onTestNotification} style={styles.testButton}>
         <Text style={styles.testButtonText}>{t('settings.testButton')}</Text>
       </Pressable>
+      </SettingsSection>
 
-      <Pressable onPress={shareApp} style={styles.shareButton}>
-        <Text style={styles.shareButtonText}>{t('settings.shareButton')}</Text>
-      </Pressable>
-
-      <Pressable
-        onPress={() => Alert.alert(t('settings.privacyTitle'), t('settings.privacyText'))}
-        style={styles.linkRow}
+      <SettingsSection
+        title={t('settings.sectionAppearance')}
+        icon="🎨"
+        open={isOpen('appearance')}
+        onToggle={() => toggleSection('appearance')}
+        reduceMotion={reduceMotion}
       >
-        <Text style={styles.linkText}>{t('settings.privacyLink')}</Text>
-      </Pressable>
+        <View style={[styles.card, styles.cardFirst]}>
+          <Text style={styles.settingLabel}>{t('settings.appearanceLabel')}</Text>
+          <SegmentedControl
+            styles={styles}
+            options={THEME_MODES}
+            value={themePreference}
+            onChange={setThemePreference}
+            t={t}
+          />
+        </View>
+
+        <View style={styles.card}>
+          <Text style={styles.settingLabel}>{t('settings.languageLabel')}</Text>
+          <SegmentedControl
+            styles={styles}
+            options={LANGUAGE_MODES}
+            value={locale}
+            onChange={setLocale}
+            t={t}
+            wrap
+          />
+        </View>
+      </SettingsSection>
+
+      <SettingsSection
+        title={t('settings.sectionShare')}
+        icon="💌"
+        open={isOpen('share')}
+        onToggle={() => toggleSection('share')}
+        reduceMotion={reduceMotion}
+      >
+        <Pressable onPress={shareApp} style={styles.shareButton}>
+          <Text style={styles.shareButtonText}>{t('settings.shareButton')}</Text>
+        </Pressable>
+
+        <ShareCard />
+      </SettingsSection>
+
+      <SettingsSection
+        title={t('settings.sectionAbout')}
+        icon="ℹ️"
+        open={isOpen('about')}
+        onToggle={() => toggleSection('about')}
+        reduceMotion={reduceMotion}
+      >
+        <View style={[styles.card, styles.cardFirst]}>
+          <View style={styles.cardRow}>
+            <Text style={styles.settingLabel}>{t('settings.versionLabel')}</Text>
+            <Text style={styles.stepperLabel}>{appConfig?.expo?.version ?? ''}</Text>
+          </View>
+        </View>
+
+        {privacyOptionsRequired && (
+          <Pressable
+            onPress={() => showPrivacyOptions()}
+            accessibilityRole="button"
+            style={styles.quickButtonWide}
+          >
+            <Text style={styles.quickButtonText}>{t('settings.adPrivacyOptions')}</Text>
+          </Pressable>
+        )}
+
+        <Pressable
+          onPress={() => {
+            if (PRIVACY_POLICY_URL) {
+              Linking.openURL(PRIVACY_POLICY_URL).catch(() =>
+                Alert.alert(t('settings.privacyTitle'), t('settings.privacyText'))
+              );
+            } else {
+              Alert.alert(t('settings.privacyTitle'), t('settings.privacyText'));
+            }
+          }}
+          style={styles.linkRow}
+        >
+          <Text style={styles.linkText}>{t('settings.privacyLink')}</Text>
+        </Pressable>
+      </SettingsSection>
 
       <AdBanner />
     </ScrollView>
@@ -256,22 +560,37 @@ function createStyles(colors) {
       paddingBottom: 24,
     },
     header: {
-      fontSize: 20,
-      fontWeight: '700',
+      fontSize: 22,
+      fontWeight: '800',
+      letterSpacing: -0.2,
       color: colors.text,
-      marginBottom: 14,
+      marginBottom: 18,
     },
-    card: {
+    nameCard: {
       backgroundColor: colors.surface,
-      borderRadius: 14,
+      borderRadius: radius.lg,
+      borderWidth: 1,
+      borderColor: colors.border,
       paddingHorizontal: 16,
-      paddingVertical: 14,
-      marginBottom: 12,
-      elevation: 2,
-      shadowColor: '#000',
-      shadowOpacity: 0.06,
+      paddingVertical: 16,
+      marginBottom: 16,
+      elevation: 1,
+      shadowColor: colors.shadow,
+      shadowOpacity: 0.05,
       shadowRadius: 6,
       shadowOffset: { width: 0, height: 2 },
+    },
+    // Bölümün (SettingsSection) kendi kartı zaten çevrede sınır çiziyor;
+    // satırları ayrı kutulara koymak yerine düz liste öğesi yapıp aralarına
+    // ince bir üst kenarlık koyuyoruz — tek bir tutarlı kart, gereksiz iç içe
+    // kutu yok.
+    card: {
+      paddingVertical: 12,
+      borderTopWidth: 1,
+      borderTopColor: colors.border,
+    },
+    cardFirst: {
+      borderTopWidth: 0,
     },
     cardRow: {
       flexDirection: 'row',
@@ -306,10 +625,19 @@ function createStyles(colors) {
       gap: 8,
       marginTop: 10,
     },
+    segmentRowWrap: {
+      flexWrap: 'wrap',
+    },
+    segmentWrap: {
+      flexGrow: 1,
+      flexBasis: '30%',
+    },
     segment: {
       flex: 1,
+      minHeight: 44,
+      justifyContent: 'center',
       paddingVertical: 10,
-      borderRadius: 10,
+      borderRadius: radius.md,
       backgroundColor: colors.inputBg,
       alignItems: 'center',
       gap: 2,
@@ -339,6 +667,56 @@ function createStyles(colors) {
       marginTop: 12,
       gap: 10,
     },
+    dayRow: {
+      flexDirection: 'row',
+      gap: 4,
+    },
+    dayChip: {
+      flex: 1,
+      minHeight: 44,
+      paddingVertical: 8,
+      borderRadius: radius.md,
+      backgroundColor: colors.inputBg,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    quickButton: {
+      alignSelf: 'flex-start',
+      minHeight: 44,
+      paddingVertical: 6,
+      paddingHorizontal: 14,
+      borderRadius: radius.md,
+      backgroundColor: colors.accentSofter,
+      justifyContent: 'center',
+    },
+    quickButtonWide: {
+      alignSelf: 'stretch',
+      alignItems: 'center',
+      justifyContent: 'center',
+      minHeight: 44,
+      paddingVertical: 12,
+      borderRadius: radius.lg,
+      backgroundColor: colors.accentSofter,
+      marginBottom: 8,
+    },
+    warningText: {
+      fontSize: 13,
+      fontWeight: '600',
+      color: '#c0392b',
+    },
+    deniedBox: {
+      marginTop: 10,
+      gap: 8,
+    },
+    deniedText: {
+      fontSize: 12,
+      color: '#c0392b',
+    },
+    quickButtonText: {
+      fontSize: 12,
+      fontWeight: '700',
+      color: colors.accentText,
+    },
     stepperRow: {
       flexDirection: 'row',
       alignItems: 'center',
@@ -354,10 +732,10 @@ function createStyles(colors) {
       gap: 10,
     },
     stepperButton: {
-      width: 30,
-      height: 30,
-      borderRadius: 8,
-      backgroundColor: colors.border,
+      width: 32,
+      height: 32,
+      borderRadius: radius.sm,
+      backgroundColor: colors.inputBg,
       alignItems: 'center',
       justifyContent: 'center',
     },
@@ -374,10 +752,11 @@ function createStyles(colors) {
       textAlign: 'center',
     },
     testButton: {
-      marginTop: 8,
+      minHeight: 44,
+      justifyContent: 'center',
       paddingVertical: 12,
-      borderRadius: 12,
-      backgroundColor: colors.border,
+      borderRadius: radius.lg,
+      backgroundColor: colors.inputBg,
       alignItems: 'center',
     },
     testButtonText: {
@@ -386,9 +765,10 @@ function createStyles(colors) {
       color: colors.subtext,
     },
     shareButton: {
-      marginTop: 10,
+      minHeight: 44,
+      justifyContent: 'center',
       paddingVertical: 12,
-      borderRadius: 12,
+      borderRadius: radius.lg,
       backgroundColor: colors.accentSofter,
       alignItems: 'center',
     },
@@ -398,8 +778,9 @@ function createStyles(colors) {
       color: colors.accentText,
     },
     linkRow: {
-      marginTop: 16,
+      minHeight: 44,
       alignItems: 'center',
+      justifyContent: 'center',
       paddingVertical: 8,
     },
     linkText: {
