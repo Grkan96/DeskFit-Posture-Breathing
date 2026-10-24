@@ -7,7 +7,9 @@
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.gurkanuslu.durus",
+      "buildNumber": "1"
     },
     "android": {
       "adaptiveIcon": {
@@ -15,7 +17,9 @@
         "foregroundImage": "./assets/android-icon-foreground.png",
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
-      }
+      },
+      "package": "com.gurkanuslu.durus",
+      "versionCode": 1
     },
     "web": {
       "favicon": "./assets/favicon.png"
@@ -33,11 +37,46 @@
       [
         "react-native-google-mobile-ads",
         {
-          "androidAppId": "ca-app-pub-3940256099942544~3347511713",
-          "iosAppId": "ca-app-pub-3940256099942544~1458002511"
+          "androidAppId": "ca-app-pub-3272042685849939~2704849029",
+          "iosAppId": "ca-app-pub-3940256099942544~1458002511",
+          "delayAppMeasurementInit": true,
+          "userTrackingUsageDescription": "Your device identifier is used to show you more relevant ads. You can decline and still use the app."
         }
       ],
-      "expo-status-bar"
-    ]
+      "expo-status-bar",
+      [
+        "react-native-android-widget",
+        {
+          "widgets": [
+            {
+              "name": "StreakWidget",
+              "label": "Duruş Hatırlatıcı",
+              "description": "Bugünkü seri ve seans ilerlemeni gösterir.",
+              "minWidth": "180dp",
+              "minHeight": "110dp",
+              "targetCellWidth": 3,
+              "targetCellHeight": 2,
+              "resizeMode": "horizontal|vertical",
+              "updatePeriodMillis": 1800000
+            }
+          ]
+        }
+      ],
+      [
+        "expo-audio",
+        {
+          "microphonePermission": false,
+          "recordAudioAndroid": false,
+          "enableBackgroundPlayback": false
+        }
+      ],
+      "./plugins/withoutUnusedAndroidPermissions.js"
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "541d91a5-55f7-4109-b5cc-21f439153929"
+      }
+    },
+    "owner": "gurkan96"
   }
 }
